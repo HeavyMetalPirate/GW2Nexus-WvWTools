@@ -25,9 +25,6 @@
     <ClInclude Include="imgui\imgui.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="imgui\imgui_extensions.h">
-      <Filter>imgui</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -41,6 +38,7 @@
       <Filter>imgui</Filter>
     </ClInclude>
     <ClInclude Include="nexus\Nexus.h" />
+    <ClInclude Include="mumble\Mumble.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">
