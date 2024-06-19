@@ -1,0 +1,2 @@
+E:/cpp/nexus/addon_dev/GW2Nexus-WvWTools/vcpkg_installed/vcpkg/blds/detect_compiler/x64-windows-rel/CMakeFiles/edit_cache.dir
+E:/cpp/nexus/addon_dev/GW2Nexus-WvWTools/vcpkg_installed/vcpkg/blds/detect_compiler/x64-windows-rel/CMakeFiles/rebuild_cache.dir
