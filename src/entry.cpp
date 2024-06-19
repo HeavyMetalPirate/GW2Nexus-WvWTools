@@ -114,8 +114,8 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Flags = EAddonFlags_None;
 
 	/* not necessary if hosted on Raidcore, but shown anyway for the example also useful as a backup resource */
-	//AddonDef.Provider = EUpdateProvider_GitHub;
-	//AddonDef.UpdateLink = "https://github.com/RaidcoreGG/GW2Nexus-AddonTemplate";
+	AddonDef.Provider = EUpdateProvider_GitHub;
+	AddonDef.UpdateLink = "https://github.com/HeavyMetalPirate/GW2Nexus-WvWTools";
 
 	return &AddonDef;
 }
