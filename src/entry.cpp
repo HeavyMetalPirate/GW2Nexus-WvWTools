@@ -63,8 +63,8 @@ Settings settings = {
 
 	false,	// renderAutoPipsResult
 	{50,50},// autoPipsPosition
-	0,		// autoPipsAlign
-	300,	// autoPipsWidth
+	300,		// autoPipsAlign
+	0,			// autoPipsWidth
 	false,	// renderKillDeathRatio
 	{50,50},// killDeathPosition
 	false,	// renderKDSameLine
