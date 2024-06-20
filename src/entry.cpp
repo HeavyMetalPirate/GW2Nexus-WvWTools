@@ -29,6 +29,7 @@ void AddonSimpleShortcut();
 // Events => TODO MumbleIdentityChange for Tagged Up/Down iirc
 void HandleArcEventLocal(void* eventArgs);
 void HandleIdentityChanged(void* eventArgs);
+void HandleAccountName(void* eventArgs);
 // Settings
 void LoadSettings();
 void StoreSettings();
@@ -43,6 +44,7 @@ Mumble::Data* MumbleLink	= nullptr;
 gw2api::wvw::Match* match	= nullptr;
 
 bool unloading = false;
+std::string accountName = "";
 
 arcdps::StateChange stateChange = arcdps::StateChange::Unknown;
 
@@ -57,6 +59,7 @@ Settings settings = {
 	"",		// Begin Date
 	"",		// End Date
 	0,		// alliance Id
+	{},		// alliance Id per account map
 	0,		// current rank
 	0,		// current pips progressed
 	false,	// has commitment
@@ -104,7 +107,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "WvW Toolbox";	
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 1;
+	AddonDef.Version.Minor = 2;
 	AddonDef.Version.Build = 0;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "HeavyMetalPirate.2695";
@@ -154,12 +157,15 @@ void AddonLoad(AddonAPI* aApi)
 	// Events
 	APIDefs->SubscribeEvent("EV_ARCDPS_COMBATEVENT_LOCAL_RAW", HandleArcEventLocal);
 	APIDefs->SubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
+	APIDefs->SubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
 
 	// Add an options window and a regular render callback
 	APIDefs->RegisterRender(ERenderType_PreRender, AddonPreRender);
 	APIDefs->RegisterRender(ERenderType_Render, AddonRender);
 	APIDefs->RegisterRender(ERenderType_PostRender, AddonPostRender);
 	APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
+
+	APIDefs->RaiseEventNotification("EV_REQUEST_ACCOUNT_NAME");
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#00ff00>WvWToolbox</c> was loaded.");
 }
@@ -180,6 +186,7 @@ void AddonUnload()
 
 	APIDefs->UnsubscribeEvent("EV_ARCDPS_COMBATEVENT_LOCAL_RAW", HandleArcEventLocal);
 	APIDefs->UnsubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
+	APIDefs->UnsubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
 
 	APIDefs->DeregisterRender(AddonPreRender);
 	APIDefs->DeregisterRender(AddonRender);
@@ -207,17 +214,16 @@ void AddonRender()
 ///----------------------------------------------------------------------------------------------------
 void AddonOptions()
 {
-	// TODO render current auto pips calculator settings and option to overwrite
+	ImGui::Text(("Current account name: " + accountName).c_str());
 
 	gw2api::worlds::alliance* currentAlliance = worldInventory.getAlliance(settings.allianceId);
-
 	if (currentAlliance == nullptr) {
 		ImGui::Text("No WvW alliance selected as home.");
 	}
 	else {
 		ImGui::Text(("Current alliance selection: " + currentAlliance->name).c_str());
 	}
-
+	
 	if (ImGui::Button("Alliance Selection")) {
 		showServerSelection = !showServerSelection;
 	}
@@ -236,9 +242,15 @@ void AddonOptions()
 						ImGui::TableNextColumn();
 
 						if (ImGui::Button(w->name.c_str())) {
-							settings.allianceId = w->id;
+							if (!accountName.empty()) {
+								settings.accountAllianceId[accountName] = w->id;
+							}
+							else {
+								settings.allianceId = w->id;
+							}
 							matchService.loadMatchData();
 							showServerSelection = false;
+							StoreSettings();
 						}
 
 						i++;
@@ -260,9 +272,15 @@ void AddonOptions()
 						ImGui::TableNextColumn();
 
 						if (ImGui::Button(w->name.c_str())) {
-							settings.allianceId = w->id;
+							if (!accountName.empty()) {
+								settings.accountAllianceId[accountName] = w->id;
+							}
+							else {
+								settings.allianceId = w->id;
+							}
 							matchService.loadMatchData();
 							showServerSelection = false;
+							StoreSettings();
 						}
 
 						i++;
@@ -295,6 +313,7 @@ void AddonOptions()
 	strncpy_s(bufferAutoPipsFormat, settings.autoPipsDisplayFormat.c_str(), sizeof(bufferAutoPipsFormat));
 	if (ImGui::InputText("AutoCalc Display Format", bufferAutoPipsFormat, sizeof(bufferAutoPipsFormat))) {
 		settings.autoPipsDisplayFormat = bufferAutoPipsFormat;
+		StoreSettings();
 	}
 	ImGui::TextWrapped("Placeholders: @p (Pips per tick), @d (Pips done total), @t (Tickets done total), @r (time remaining until first diamond completion)");
 
@@ -302,6 +321,7 @@ void AddonOptions()
 	strncpy_s(bufferAutoPipsDone, settings.autoPipsDoneText.c_str(), sizeof(bufferAutoPipsDone));
 	if (ImGui::InputText("AutoCalc 'Done' (=0 time left) text", bufferAutoPipsDone, sizeof(bufferAutoPipsDone))) {
 		settings.autoPipsDoneText = bufferAutoPipsDone;
+		StoreSettings();
 	}
 	if (ImGui::BeginTable("##AutoPipsProps", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
 		ImGui::TableNextRow();
@@ -318,7 +338,7 @@ void AddonOptions()
 		textAlignComboItems[1] = "Left";
 		textAlignComboItems[2] = "Right";
 		if (ImGui::Combo("Alignment", &settings.autoPipsAlignment, textAlignComboItems, IM_ARRAYSIZE(textAlignComboItems))) {
-
+			StoreSettings();
 		}
 
 		ImGui::EndTable();
@@ -399,6 +419,7 @@ void AddonOptions()
 		if (ImGui::Button("override")) {
 			settings.hasCommitment = !settings.hasCommitment;
 			autoPipsCalculator.commitment = settings.hasCommitment;
+			StoreSettings();
 		}
 	}
 }
@@ -500,4 +521,18 @@ void HandleIdentityChanged(void* anEventArgs) {
 	if (identity == nullptr) return;
 	autoPipsCalculator.commander = identity->IsCommander;
 	autoPipsCalculator.publicCommander = identity->IsCommander;
+}
+
+void HandleAccountName(void* eventArgs) {
+	const char* name = (const char*)eventArgs;
+	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Received Account Name: " + std::string(name)).c_str());
+	
+	accountName = std::string(name);
+	if(!accountName.empty())
+		accountName = accountName.substr(1);
+
+	if (settings.accountAllianceId.count(accountName) == 0) {
+		settings.accountAllianceId[accountName] = settings.allianceId;
+	}
+	StoreSettings();
 }

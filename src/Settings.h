@@ -29,6 +29,7 @@ struct Settings {
     std::string matchBegin;
     std::string matchEnd;
     int allianceId;
+    std::map<std::string, int> accountAllianceId;
     int currentRank;
     int pipsProgressed;
     bool hasCommitment;
@@ -54,6 +55,7 @@ inline void to_json(json& j, const Settings& settings) {
         {"matchBegin", settings.matchBegin},
         {"matchEnd", settings.matchEnd},
         {"allianceId", settings.allianceId},
+        {"accountAllianceId", settings.accountAllianceId},
         {"currentRank", settings.currentRank},
         {"pipsProgressed", settings.pipsProgressed},
         {"hasCommitment", settings.hasCommitment},
@@ -77,6 +79,11 @@ inline void from_json(const json& j, Settings& s) {
     j.at("currentRank").get_to(s.currentRank);
     j.at("pipsProgressed").get_to(s.pipsProgressed);
     j.at("hasCommitment").get_to(s.hasCommitment);
+
+    if (j.contains("accountAllianceId"))
+        j.at("accountAllianceId").get_to(s.accountAllianceId);
+    else
+        s.accountAllianceId = std::map<std::string, int>();
 
     if(j.contains("renderAutoPipsResult"))
         j.at("renderAutoPipsResult").get_to(s.renderAutoPipsResult);

@@ -1,10 +1,10 @@
 #include "WvWMatchService.h"
 
 void WvWMatchService::loadMatchData() {
-	if (settings.allianceId == 0) return; // no allianceId selected
+	if (settings.accountAllianceId[accountName] == 0) return; // no allianceId selected
 	
 	try {
-		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(settings.allianceId);
+		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(settings.accountAllianceId[accountName]);
 		std::string matchResponse = HTTPClient::GetRequest(url);
 		if (matchResponse == "") {
 			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Empty Response from WvW API. Certain functionality might not be fully available.");

@@ -50,6 +50,7 @@ extern gw2api::wvw::Match* match;
 
 extern Settings settings;
 
+extern std::string accountName;
 extern bool unloading;
 
 /* Utility */
