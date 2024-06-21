@@ -26,11 +26,12 @@
 #include "nexus/Nexus.h"
 #include "mumble/Mumble.h"
 
-#include "Constants.h"
-#include "Settings.h"
-
+#include "entity/EventDefinitions.h"
 #include "entity/GW2API_WvW.h"
 #include "entity/GW2API_Worlds.h"
+
+#include "Constants.h"
+#include "Settings.h"
 
 #include "ArcDPS.h"
 #include "service/PipsCalculator.h"

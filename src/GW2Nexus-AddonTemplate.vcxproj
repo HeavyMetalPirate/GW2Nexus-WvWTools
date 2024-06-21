@@ -175,6 +175,7 @@
   <ItemGroup>
     <ClInclude Include="ArcDPS.h" />
     <ClInclude Include="Constants.h" />
+    <ClInclude Include="entity\EventDefinitions.h" />
     <ClInclude Include="entity\GW2API_Worlds.h" />
     <ClInclude Include="entity\GW2API_WvW.h" />
     <ClInclude Include="Globals.h" />

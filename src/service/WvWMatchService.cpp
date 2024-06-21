@@ -1,10 +1,19 @@
 #include "WvWMatchService.h"
 
 void WvWMatchService::loadMatchData() {
-	if (settings.accountAllianceId[accountName] == 0) return; // no allianceId selected
+	int allianceId = 0;
+
+	if (settings.accountSettings.count(accountName) > 0) {
+		allianceId = settings.accountSettings[accountName].allianceId;
+	}
+	else {
+		allianceId = settings.accountSettings[genericAccount].allianceId;
+	}
+
+	if (allianceId == 0) return; // no allianceId selected
 	
 	try {
-		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(settings.accountAllianceId[accountName]);
+		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(allianceId);
 		std::string matchResponse = HTTPClient::GetRequest(url);
 		if (matchResponse == "") {
 			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Empty Response from WvW API. Certain functionality might not be fully available.");
@@ -67,8 +76,16 @@ void WvWMatchService::setAutoPipsCalculatorValues() {
 	if (match == nullptr) return;
 	std::chrono::system_clock::time_point oldMatchEnd, currentMatchBegin;
 
-	if (!settings.matchEnd.empty())
-		oldMatchEnd = parse_date(settings.matchEnd);
+	AccountSettings* accountSettings;
+	if (settings.accountSettings.count(accountName) > 0) {
+		accountSettings = &settings.accountSettings[accountName];
+	}
+	else {
+		accountSettings = &settings.accountSettings[genericAccount];
+	}
+
+	if (!accountSettings->matchEnd.empty())
+		oldMatchEnd = parse_date(accountSettings->matchEnd);
 	else
 		oldMatchEnd = parse_date("1970-01-01T02:00:00Z");
 
@@ -80,14 +97,14 @@ void WvWMatchService::setAutoPipsCalculatorValues() {
 		auto duration = currentMatchBegin - oldMatchEnd;
 		auto days = std::chrono::duration_cast<std::chrono::hours>(duration).count() / 24;
 
-		if (settings.pipsProgressed >= 100 && days <= 7) {
-			settings.hasCommitment = true;
+		if (accountSettings->pipsProgressed >= 100 && days <= 7) {
+			accountSettings->hasCommitment = true;
 			autoPipsCalculator.commitment = true;
 		}
 		// set to new match stuff
-		settings.pipsProgressed = 0;
-		settings.matchBegin = match->start_time;
-		settings.matchEnd = match->end_time;
+		accountSettings->pipsProgressed = 0;
+		accountSettings->matchBegin = match->start_time;
+		accountSettings->matchEnd = match->end_time;
 
 		// reset also the auto pips calculator stuff
 		autoPipsCalculator.setPipsProgress(0);
@@ -96,13 +113,13 @@ void WvWMatchService::setAutoPipsCalculatorValues() {
 	std::string userTeam;
 
 	for (const auto& pair : match->all_worlds) {
-		if (contains_value(pair.second, settings.allianceId)) {
+		if (contains_value(pair.second, accountSettings->allianceId)) {
 			userTeam = pair.first;
 		}
 	}
 
 	if (userTeam.empty()) {
-		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Could not find team name for user allianceId " + std::to_string(settings.allianceId)).c_str());
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Could not find team name for user allianceId " + std::to_string(accountSettings->allianceId)).c_str());
 		return;
 	}
 	// get the score of the last skirmish

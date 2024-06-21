@@ -55,6 +55,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="entity\GW2API_Worlds.h" />
     <ClInclude Include="service\WvWMatchService.h" />
+    <ClInclude Include="entity\EventDefinitions.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">

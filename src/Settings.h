@@ -25,14 +25,35 @@ inline void from_json(const json& j, Position& position) {
     j.at("y").get_to(position.y);
 }
 
-struct Settings {
+struct AccountSettings {
     std::string matchBegin;
     std::string matchEnd;
     int allianceId;
-    std::map<std::string, int> accountAllianceId;
     int currentRank;
     int pipsProgressed;
     bool hasCommitment;
+};
+inline void to_json(json& j, const AccountSettings& settings) {
+    j = json{
+        {"matchBegin", settings.matchBegin},
+        {"matchEnd", settings.matchEnd},
+        {"allianceId", settings.allianceId},
+        {"currentRank", settings.currentRank},
+        {"pipsProgressed", settings.pipsProgressed},
+        {"hasCommitment", settings.hasCommitment}
+    };
+}
+inline void from_json(const json& j, AccountSettings& s) {
+    j.at("matchBegin").get_to(s.matchBegin);
+    j.at("matchEnd").get_to(s.matchEnd);
+    j.at("allianceId").get_to(s.allianceId);
+    j.at("currentRank").get_to(s.currentRank);
+    j.at("pipsProgressed").get_to(s.pipsProgressed);
+    j.at("hasCommitment").get_to(s.hasCommitment);
+}
+
+struct Settings {
+    std::map<std::string, AccountSettings> accountSettings;
 
     // display settings
     bool renderAutoPipsResult;
@@ -45,20 +66,13 @@ struct Settings {
 
     std::string autoPipsDisplayFormat;
     std::string autoPipsDoneText;
-
 };
 
 
 // Function to convert the struct to JSON
 inline void to_json(json& j, const Settings& settings) {
     j = json{
-        {"matchBegin", settings.matchBegin},
-        {"matchEnd", settings.matchEnd},
-        {"allianceId", settings.allianceId},
-        {"accountAllianceId", settings.accountAllianceId},
-        {"currentRank", settings.currentRank},
-        {"pipsProgressed", settings.pipsProgressed},
-        {"hasCommitment", settings.hasCommitment},
+        {"accountSettings", settings.accountSettings},
         {"renderAutoPipsResult", settings.renderAutoPipsResult},
         {"autoPipsPosition", settings.autoPipsPosition},
         {"autoPipsAlignment", settings.autoPipsAlignment},
@@ -73,18 +87,9 @@ inline void to_json(json& j, const Settings& settings) {
 
 // Function to populate the struct from JSON
 inline void from_json(const json& j, Settings& s) {
-    j.at("matchBegin").get_to(s.matchBegin);
-    j.at("matchEnd").get_to(s.matchEnd);
-    j.at("allianceId").get_to(s.allianceId);
-    j.at("currentRank").get_to(s.currentRank);
-    j.at("pipsProgressed").get_to(s.pipsProgressed);
-    j.at("hasCommitment").get_to(s.hasCommitment);
 
-    if (j.contains("accountAllianceId"))
-        j.at("accountAllianceId").get_to(s.accountAllianceId);
-    else
-        s.accountAllianceId = std::map<std::string, int>();
-
+    if(j.contains("accountSettings"))
+        j.at("accountSettings").get_to(s.accountSettings);
     if(j.contains("renderAutoPipsResult"))
         j.at("renderAutoPipsResult").get_to(s.renderAutoPipsResult);
     if (j.contains("autoPipsPosition"))

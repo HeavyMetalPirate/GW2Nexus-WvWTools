@@ -30,6 +30,7 @@ void AddonSimpleShortcut();
 void HandleArcEventLocal(void* eventArgs);
 void HandleIdentityChanged(void* eventArgs);
 void HandleAccountName(void* eventArgs);
+void HandleSelfJoin(void* eventArgs);
 // Settings
 void LoadSettings();
 void StoreSettings();
@@ -55,30 +56,12 @@ WorldInventory worldInventory;
 WvWMatchService matchService;
 
 /* settings */
-Settings settings = {
-	"",		// Begin Date
-	"",		// End Date
-	0,		// alliance Id
-	{},		// alliance Id per account map
-	0,		// current rank
-	0,		// current pips progressed
-	false,	// has commitment
-
-	false,	// renderAutoPipsResult
-	{50,50},// autoPipsPosition
-	300,		// autoPipsAlign
-	0,			// autoPipsWidth
-	false,	// renderKillDeathRatio
-	{50,50},// killDeathPosition
-	false,	// renderKDSameLine
-
-	"per TicK: @p, done: @d of 1450, tickets: @t of 365, remaining: @r",	// autoPips Format
-	"Done for the week, see you at reset!"									// autoPips done message
-};
+Settings settings = {};
 
 /* temporary settings */
 bool renderPipsCalculator = false;
 bool showServerSelection = false;
+bool showOverrideAutoCalc = false;
 
 ///----------------------------------------------------------------------------------------------------
 /// DllMain:
@@ -108,7 +91,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Name = "WvW Toolbox";	
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 2;
-	AddonDef.Version.Build = 0;
+	AddonDef.Version.Build = 1;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "HeavyMetalPirate.2695";
 	AddonDef.Description = "Tools to enhance your World vs. World experience.";
@@ -158,6 +141,7 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->SubscribeEvent("EV_ARCDPS_COMBATEVENT_LOCAL_RAW", HandleArcEventLocal);
 	APIDefs->SubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
 	APIDefs->SubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
+	APIDefs->SubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
 
 	// Add an options window and a regular render callback
 	APIDefs->RegisterRender(ERenderType_PreRender, AddonPreRender);
@@ -187,6 +171,7 @@ void AddonUnload()
 	APIDefs->UnsubscribeEvent("EV_ARCDPS_COMBATEVENT_LOCAL_RAW", HandleArcEventLocal);
 	APIDefs->UnsubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
 	APIDefs->UnsubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
+	APIDefs->UnsubscribeEvent("EV_ARCDPS_SELF_JOIN", nullptr);
 
 	APIDefs->DeregisterRender(AddonPreRender);
 	APIDefs->DeregisterRender(AddonRender);
@@ -214,9 +199,17 @@ void AddonRender()
 ///----------------------------------------------------------------------------------------------------
 void AddonOptions()
 {
+	AccountSettings* accountSettings;
+	if (settings.accountSettings.count(accountName) > 0) {
+		accountSettings = &settings.accountSettings[accountName];
+	}
+	else {
+		accountSettings = &settings.accountSettings[genericAccount];
+	}
+
 	ImGui::Text(("Current account name: " + accountName).c_str());
 
-	gw2api::worlds::alliance* currentAlliance = worldInventory.getAlliance(settings.allianceId);
+	gw2api::worlds::alliance* currentAlliance = worldInventory.getAlliance(accountSettings->allianceId);
 	if (currentAlliance == nullptr) {
 		ImGui::Text("No WvW alliance selected as home.");
 	}
@@ -242,12 +235,7 @@ void AddonOptions()
 						ImGui::TableNextColumn();
 
 						if (ImGui::Button(w->name.c_str())) {
-							if (!accountName.empty()) {
-								settings.accountAllianceId[accountName] = w->id;
-							}
-							else {
-								settings.allianceId = w->id;
-							}
+							accountSettings->allianceId = w->id;
 							matchService.loadMatchData();
 							showServerSelection = false;
 							StoreSettings();
@@ -272,12 +260,7 @@ void AddonOptions()
 						ImGui::TableNextColumn();
 
 						if (ImGui::Button(w->name.c_str())) {
-							if (!accountName.empty()) {
-								settings.accountAllianceId[accountName] = w->id;
-							}
-							else {
-								settings.allianceId = w->id;
-							}
+							accountSettings->allianceId = w->id;
 							matchService.loadMatchData();
 							showServerSelection = false;
 							StoreSettings();
@@ -410,16 +393,33 @@ void AddonOptions()
 		}
 		ImGui::TextWrapped("These values will update if you play World vs. World in the following:");
 		ImGui::TextWrapped("- Server Rank will be updated by calls to the REST API using the alliance provided above");
-		ImGui::TextWrapped("- Personal Rank will be updated as soon as you level up");
-		ImGui::TextWrapped("- Chests done will be updated everytime you finish another skirmish reward track step");
+		ImGui::TextWrapped("- Personal Rank will be updated every time you receive a level up reward bouncy chest");
+		ImGui::TextWrapped("- Chests done will be updated everytime you receive a skirmish reward track step bouncy chest");
 		ImGui::TextWrapped("- (Public) Commander will be updated if you tag up/down");
 		ImGui::TextWrapped("- Commitment will be updated if a new matchup is detected (compared to settings) and at least 4 chests (=100 pips) were finished at that point");
-		ImGui::Text("In case you want to override commitment, use this button:");
+		ImGui::Text("In case you want to override values, use this button:");
 		ImGui::SameLine();
-		if (ImGui::Button("override")) {
-			settings.hasCommitment = !settings.hasCommitment;
-			autoPipsCalculator.commitment = settings.hasCommitment;
-			StoreSettings();
+		if (ImGui::Button("Override Settings")) {
+			showOverrideAutoCalc = true;
+		}
+
+		if (showOverrideAutoCalc) {
+			if (ImGui::Button("Save")) {
+				showOverrideAutoCalc = false;
+				StoreSettings();
+			}
+
+			if (ImGui::Button("Change Commitment")) {
+				accountSettings->hasCommitment = !accountSettings->hasCommitment;
+				autoPipsCalculator.commitment = accountSettings->hasCommitment;
+			}
+			if (ImGui::InputInt("WvW Rank", &accountSettings->currentRank)) {
+				autoPipsCalculator.setPersonalRank(accountSettings->currentRank);
+			}
+			if (ImGui::InputInt("Pips done", &accountSettings->pipsProgressed)) {
+				autoPipsCalculator.setPipsProgress(accountSettings->pipsProgressed);
+			}
+			ImGui::TextWrapped("(Use the manual calculator to figure out pips for your current completion; 1450 Pips = diamond skirmish track completion)");
 		}
 	}
 }
@@ -456,16 +456,24 @@ void HandleArcEventLocal(void* eventArgs) {
 		APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Reward Id: " + std::to_string(rewardId) + ", Reward Type: " + std::to_string(rewardType)).c_str());
 #endif // !NDEBUG
 		
+		AccountSettings* accountSettings;
+		if (settings.accountSettings.count(accountName) > 0) {
+			accountSettings = &settings.accountSettings[accountName];
+		}
+		else {
+			accountSettings = &settings.accountSettings[genericAccount];
+		}
+
 		arcdps::RewardType reward = arcdps::RewardTypeFromInt(rewardType);
 
 		switch (reward) {
 			// rewardId = current rank
-		case arcdps::RewardType::WvWRankUp: autoPipsCalculator.setPersonalRank(rewardId); settings.currentRank = rewardId; break;
+		case arcdps::RewardType::WvWRankUp: autoPipsCalculator.setPersonalRank(rewardId); accountSettings->currentRank = rewardId; StoreSettings(); break;
 			// rewardId = Pips to current chest (i.e. finishing last chest of diamond = 1450)
-		case arcdps::RewardType::WvWSkirmishProgress: autoPipsCalculator.setPipsProgress(rewardId); settings.pipsProgressed = rewardId;  break;
+		case arcdps::RewardType::WvWSkirmishProgress: autoPipsCalculator.setPipsProgress(rewardId); accountSettings->pipsProgressed = rewardId; StoreSettings(); break;
 			// rewardId = id of the reward track, i.e. 376 = GoB track
-			case arcdps::RewardType::WvWTrackProgress: break; 
-			default: break;// No op
+		case arcdps::RewardType::WvWTrackProgress: break; 
+		default: break;// No op
 		}
 	}
 }
@@ -483,14 +491,82 @@ void LoadSettings() {
 			// parse settings, yay
 			settings = jsonData;
 
-			// set autopips calc values
-			autoPipsCalculator.commitment = settings.hasCommitment;
-			autoPipsCalculator.setPersonalRank(settings.currentRank);
-			autoPipsCalculator.setPipsProgress(settings.pipsProgressed);
+			// if accountSettings are empty, initialize them
+			if (settings.accountSettings.size() == 0) {
+				// try to restore legacy settings
+				std::string matchBegin = "1970-01-01T18:00:00Z";
+				std::string matchEnd = "1970-01-01T18:00:00Z";
+				int allianceId = 0;
+				int pipsDone = 0;
+				int rank = 0;
+				bool commitment = false;
+
+				if (jsonData.contains("matchBegin")) {
+					matchBegin = jsonData["matchBegin"].get<std::string>();
+				}
+				if (jsonData.contains("matchEnd")) {
+					matchEnd = jsonData["matchEnd"].get<std::string>();
+				}
+				if (jsonData.contains("allianceId")) {
+					allianceId = jsonData["allianceId"].get<int>();
+				}
+				if (jsonData.contains("currentRank")) {
+					rank = jsonData["currentRank"].get<int>();
+				}
+				if (jsonData.contains("pipsProgressed")) {
+					pipsDone = jsonData["pipsProgressed"].get<int>();
+				}
+				if (jsonData.contains("hasCommitment")) {
+
+					commitment = jsonData["hasCommitment"].get<bool>();
+				}
+				AccountSettings as = {
+					matchBegin,
+					matchEnd,
+					allianceId,
+					rank,
+					pipsDone,
+					commitment
+				};
+				settings.accountSettings.emplace(genericAccount, as);
+			}
+
+			if (accountName.empty()) {
+				autoPipsCalculator.setPersonalRank(settings.accountSettings[genericAccount].currentRank);
+				autoPipsCalculator.setPipsProgress(settings.accountSettings[genericAccount].pipsProgressed);
+				autoPipsCalculator.commitment = settings.accountSettings[genericAccount].hasCommitment;
+			}
+			else {
+				autoPipsCalculator.setPersonalRank(settings.accountSettings[accountName].currentRank);
+				autoPipsCalculator.setPipsProgress(settings.accountSettings[accountName].pipsProgressed);
+				autoPipsCalculator.commitment = settings.accountSettings[accountName].hasCommitment;
+			}
 		}
 	}
 	else {
 		// Create new settings!
+		settings = {
+			{
+				{ genericAccount, {
+						"1970-01-01T18:00:00Z",
+						"1970-01-01T18:00:00Z",
+						0,
+						0,
+						0,
+						false
+					}
+				}
+			},
+			false,
+			{50,50},
+			300,
+			0,
+			false,
+			{50,50},
+			false,
+			"per TicK: @p, done: @d of 1450, tickets: @t of 365, remaining: @r",
+			"Done for the week, see you at reset!"
+		};
 		StoreSettings();
 	}
 }
@@ -499,8 +575,14 @@ void StoreSettings() {
 
 	if (match != nullptr) {
 		// set begin + end date
-		settings.matchBegin = match->start_time;
-		settings.matchEnd = match->end_time;
+		if (!accountName.empty() && settings.accountSettings.contains(accountName)) {
+			settings.accountSettings[accountName].matchBegin = match->start_time;
+			settings.accountSettings[accountName].matchEnd = match->end_time;
+		}
+		else {
+			settings.accountSettings[genericAccount].matchBegin = match->start_time;
+			settings.accountSettings[genericAccount].matchEnd = match->end_time;
+		}
 	}
 
 	json j = settings;
@@ -524,6 +606,8 @@ void HandleIdentityChanged(void* anEventArgs) {
 }
 
 void HandleAccountName(void* eventArgs) {
+	if (!accountName.empty()) return; // we already got the name, ignore this
+
 	const char* name = (const char*)eventArgs;
 	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Received Account Name: " + std::string(name)).c_str());
 	
@@ -531,8 +615,39 @@ void HandleAccountName(void* eventArgs) {
 	if(!accountName.empty())
 		accountName = accountName.substr(1);
 
-	if (settings.accountAllianceId.count(accountName) == 0) {
-		settings.accountAllianceId[accountName] = settings.allianceId;
+	if (settings.accountSettings.count(accountName) == 0) {
+		// clone generic settings
+		AccountSettings as = AccountSettings(settings.accountSettings[genericAccount]);
+		settings.accountSettings.emplace(accountName, as);
 	}
+
+	autoPipsCalculator.setPersonalRank(settings.accountSettings[accountName].currentRank);
+	autoPipsCalculator.setPipsProgress(settings.accountSettings[accountName].pipsProgressed);
+	autoPipsCalculator.commitment = settings.accountSettings[accountName].hasCommitment;
+
+	StoreSettings();
+}
+
+void HandleSelfJoin(void* eventArgs) {
+	if (!accountName.empty()) return; // we already got the name, ignore this
+
+	EvAgentUpdate* ev = (EvAgentUpdate*)eventArgs;
+	const char* name = ev->account;
+	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Received Account Name: " + std::string(name)).c_str());
+
+	accountName = std::string(name);
+	if (!accountName.empty())
+		accountName = accountName.substr(1);
+
+	if (settings.accountSettings.count(accountName) == 0) {
+		// clone generic settings
+		AccountSettings as = AccountSettings(settings.accountSettings[genericAccount]);
+		settings.accountSettings.emplace(accountName, as);
+	}
+
+	autoPipsCalculator.setPersonalRank(settings.accountSettings[accountName].currentRank);
+	autoPipsCalculator.setPipsProgress(settings.accountSettings[accountName].pipsProgressed);
+	autoPipsCalculator.commitment = settings.accountSettings[accountName].hasCommitment;
+
 	StoreSettings();
 }
