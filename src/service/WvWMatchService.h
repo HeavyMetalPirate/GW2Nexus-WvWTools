@@ -5,11 +5,11 @@
 
 #include "../Globals.h"
 #include "HttpClient.h"
-#include "../entity/GW2API_WvW.h"
-
 
 class WvWMatchService {
 public:
+	void loadObjectives();
+	void loadObjectiveUpgrades();
 	void loadMatchData();
 	void startThread();
 	void stopThread();

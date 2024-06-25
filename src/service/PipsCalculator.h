@@ -2,6 +2,7 @@
 #define PIPS_CALCULATOR_H
 
 #include "../Constants.h"
+#include <algorithm>
 
 struct PipsResult {
 	int pipsPerTick;
@@ -140,6 +141,40 @@ public:
 
 class AutoPipsCalculator : public PipsCalculator {
 public:
+	int squadSize = 1;
+	bool taggedUp;
+
+	void clearSquad() {
+		squadTracker.clear();
+		squadSize = squadTracker.size() + 1;
+		commander = false;
+		publicCommander = false;
+	}
+	void addPlayerToSquad(std::string account) {
+		auto it = std::find(squadTracker.begin(), squadTracker.end(), account);
+		if (it != squadTracker.end()) {
+			return; // we already know that player
+		}
+		squadTracker.push_back(account);
+		squadSize = squadTracker.size() + 1;
+		if (squadSize >= 5 && taggedUp)
+			commander = true;
+		if (squadSize >= 10 && taggedUp)
+			publicCommander = true;
+	}
+	void removePlayerFromSquad(std::string account) {
+		auto it = std::find(squadTracker.begin(), squadTracker.end(), account);
+		if (it == squadTracker.end()) {
+			return; // we never knew that player
+		}
+		squadTracker.erase(std::remove(squadTracker.begin(), squadTracker.end(), account), squadTracker.end());
+		squadSize = squadTracker.size() + 1;
+		if (squadSize < 10)
+			publicCommander = false;
+		if (squadSize < 5)
+			commander = false;
+	}
+
 	void setServerRank(int r) {
 		// Ranks are reversed: Rank 1 gives 3 extra pips, Rank 3 gives 1.
 		switch (r) {
@@ -233,6 +268,8 @@ public:
 		if (currentRank <= 9999) { pRank1 = 6; return; }
 		pRank1 = 7;
 	}
+private:
+	std::vector<std::string> squadTracker = std::vector<std::string>();
 };
 
 #endif

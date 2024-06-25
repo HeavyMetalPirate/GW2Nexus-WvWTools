@@ -6,6 +6,7 @@ Addon that has some widgets and tools around World vs. World.
 The following features are available:
 - Pips calculator: calculate how long you are going until you complete the diamond skirmish track
 - Kill/Death ratio: mini widget that shows current matchup K/D
+- Matchup inspector
 - Auto Pips Calculator widget: approximate auto calculation of how long until the diamond skirmish track is done
   - This requires ArcDPS for full operation
   - This also requires you to set your current WvW alliance in the options
@@ -15,7 +16,7 @@ The following features are available:
   - See the options screen for a detailed explanation
 
 ### Planned Features
-- Matchup inspector
+- Reward Track calculator
 - Matchup prediction for the next week
 - Stats widgets (i.e. victory points ranking, map stats, ...)
 - (Possible/Needs verification) Map facts (i.e. objective informations on current map)

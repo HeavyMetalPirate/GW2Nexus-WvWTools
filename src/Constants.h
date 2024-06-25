@@ -6,6 +6,8 @@ static const char* ADDON_NAME = "WvWTools";
 static const std::string genericAccount = "Generic";
 static const std::string baseUrl = "https://api.guildwars2.com";
 
+static const char* ICON_NOTIFICATION = "ICON_NOTIFICATION";
+
 static const std::vector<std::pair<std::string, int>>  tierMap = {
 	{"Wood", 4},
 	{"Bronze", 4},

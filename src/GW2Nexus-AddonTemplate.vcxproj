@@ -190,6 +190,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="service\AddonInitalize.h" />
     <ClInclude Include="service\AddonRenderer.h" />
+    <ClInclude Include="service\GuildInfoService.h" />
     <ClInclude Include="service\HttpClient.h" />
     <ClInclude Include="service\PipsCalculator.h" />
     <ClInclude Include="service\WorldInventory.h" />
@@ -197,6 +198,7 @@
     <ClInclude Include="Settings.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="entity\GW2API_Guilds.h" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
@@ -204,6 +206,7 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="service\AddonRenderer.cpp" />
+    <ClCompile Include="service\GuildInfoService.cpp" />
     <ClCompile Include="service\WorldInventory.cpp" />
     <ClCompile Include="service\WvWMatchService.cpp" />
   </ItemGroup>

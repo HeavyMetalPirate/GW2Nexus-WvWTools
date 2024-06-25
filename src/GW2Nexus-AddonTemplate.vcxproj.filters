@@ -20,6 +20,8 @@
     <ClCompile Include="service\AddonRenderer.cpp" />
     <ClCompile Include="service\WorldInventory.cpp" />
     <ClCompile Include="service\WvWMatchService.cpp" />
+    <ClCompile Include="entity\GW2API_Guilds.h" />
+    <ClCompile Include="service\GuildInfoService.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imstb_truetype.h">
@@ -56,6 +58,7 @@
     <ClInclude Include="entity\GW2API_Worlds.h" />
     <ClInclude Include="service\WvWMatchService.h" />
     <ClInclude Include="entity\EventDefinitions.h" />
+    <ClInclude Include="service\GuildInfoService.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">

@@ -1,5 +1,55 @@
 #include "WvWMatchService.h"
 
+bool objectivesLoaded = false;
+bool upgradesLoaded = false;
+
+std::chrono::time_point<std::chrono::system_clock> lastUpdate = std::chrono::system_clock::now();
+
+void WvWMatchService::loadObjectives() {
+	if (match == nullptr) return; // we need the match data for sanitizing objective names
+	try {
+		std::string url = baseUrl + "/v2/wvw/objectives?ids=all";
+		std::string matchResponse = HTTPClient::GetRequest(url);
+		if (matchResponse == "") {
+			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Empty Response from WvW API. Certain functionality might not be fully available.");
+			return;
+		}
+		json matchJson = json::parse(matchResponse);
+		std::vector<gw2api::wvw::Location> objectives = matchJson;
+		worldInventory.addObjectives(objectives, match);
+		APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Loaded objectives information.");
+		objectivesLoaded = true;
+	}
+	catch (const std::exception& e) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, e.what());
+	}
+	catch (...) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Could not load WvW match data. Certain functionality might not be fully available.");
+	}
+}
+
+void WvWMatchService::loadObjectiveUpgrades() {
+	try {
+		std::string url = baseUrl + "/v2/guild/upgrades?ids=all";
+		std::string matchResponse = HTTPClient::GetRequest(url);
+		if (matchResponse == "") {
+			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Empty Response from WvW API. Certain functionality might not be fully available.");
+			return;
+		}
+		json matchJson = json::parse(matchResponse);
+		std::vector<gw2api::wvw::ObjectiveUpgrade> upgrades = matchJson;
+		worldInventory.addObjectiveUpgrades(upgrades);
+		APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Loaded objective upgrade information.");
+		upgradesLoaded = true;
+	}
+	catch (const std::exception& e) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, e.what());
+	}
+	catch (...) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Could not load WvW match data. Certain functionality might not be fully available.");
+	}
+}
+
 void WvWMatchService::loadMatchData() {
 	int allianceId = 0;
 
@@ -26,6 +76,7 @@ void WvWMatchService::loadMatchData() {
 		match = new gw2api::wvw::Match(m);
 
 		setAutoPipsCalculatorValues();
+		lastUpdate = std::chrono::system_clock::now();
 	}
 	catch (const std::exception& e) {
 		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, e.what());
@@ -38,12 +89,21 @@ void WvWMatchService::loadMatchData() {
 void WvWMatchService::startThread() {
 	matchThread = std::thread([&] {
 		while (true) {
+
+
 			// load current match data
 #ifndef NDEBUG
 			APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Querying Match Data...");
 #endif // !NDEBUG
 
 			loadMatchData();
+
+			// optional data loads
+			if (!objectivesLoaded)
+				loadObjectives();
+			if (!upgradesLoaded)
+				loadObjectiveUpgrades();
+
 #ifndef NDEBUG
 			APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Querying done, sleeping...");
 #endif // !NDEBUG
@@ -59,8 +119,8 @@ void WvWMatchService::startThread() {
 #ifndef NDEBUG
 			APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Continuing...");
 #endif // !NDEBUG
-		}
-		
+		}		
+		APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Match Info Thread ended successfully.");
 	});
 	matchThread.detach();
 }
@@ -70,6 +130,7 @@ void WvWMatchService::stopThread() {
 	if (matchThread.joinable()) {
 		matchThread.join();
 	}
+	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Match Info Thread stopped.");
 }
 
 void WvWMatchService::setAutoPipsCalculatorValues() {

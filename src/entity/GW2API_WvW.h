@@ -10,19 +10,132 @@ inline std::chrono::system_clock::time_point parse_date(const std::string& date_
     std::tm tm = {};
     std::istringstream ss(date_str);
     ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-    return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    std::time_t time_utc = _mkgmtime(&tm);
+    return std::chrono::system_clock::from_time_t(time_utc);
 }
 inline std::string format_date(const std::chrono::system_clock::time_point& time_point) {
     std::time_t time_t = std::chrono::system_clock::to_time_t(time_point);
     std::tm tm;
-    gmtime_s(&tm, &time_t);
+    localtime_s(&tm, &time_t);
     std::ostringstream ss;
-    ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S%z");
     return ss.str();
+}
+inline std::string format_date_output(const std::chrono::system_clock::time_point& time_point) {
+    std::time_t time_t = std::chrono::system_clock::to_time_t(time_point);
+    std::tm tm;
+    localtime_s(&tm, &time_t);
+    std::ostringstream ss;
+    ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+inline std::chrono::system_clock::time_point getUTCinLocalTimePoint(const std::chrono::system_clock::time_point utc) {
+    std::time_t time_t_utc = std::chrono::system_clock::to_time_t(utc);
+    std::tm local_tm;
+    localtime_s(&local_tm, &time_t_utc);
+
+    std::time_t time_t_local = std::mktime(&local_tm);
+    return std::chrono::system_clock::from_time_t(time_t_local);
+}
+inline std::string getUTCinLocalDate(const std::string& date_str) {
+    std::chrono::system_clock::time_point utc = parse_date(date_str);
+    std::chrono::system_clock::time_point local = getUTCinLocalTimePoint(utc);
+    return format_date_output(local);
 }
 
 namespace gw2api {
     namespace wvw {
+        struct ObjectiveUpgrade {
+            int id;
+            std::string name;
+            std::string description;
+        };
+        inline void to_json(nlohmann::json& j, const ObjectiveUpgrade& i) {
+            j = nlohmann::json{
+                {"id", i.id},
+                {"name", i.name},
+                {"description", i.description}
+            };
+        }
+        inline void from_json(const nlohmann::json& j, ObjectiveUpgrade& i) {
+            j.at("id").get_to(i.id);
+            j.at("name").get_to(i.name);
+            j.at("description").get_to(i.description);
+        }
+
+        struct Location {
+            std::string id;
+            std::string name;
+            int sector_id;
+            std::string type;
+            std::string map_type;
+            int map_id;
+            std::optional<int> upgrade_id;
+            std::optional<std::vector<double>> coord;
+            std::vector<double> label_coord;
+            std::optional<std::string> marker;
+            std::string chat_link;
+        };
+        inline void to_json(nlohmann::json& j, const Location& l) {
+            j = nlohmann::json{
+                {"id", l.id},
+                {"name", l.name},
+                {"sector_id", l.sector_id},
+                {"type", l.type},
+                {"map_type", l.map_type},
+                {"map_id", l.map_id},
+                {"label_coord", l.label_coord},
+                {"chat_link", l.chat_link}
+            };
+
+            if (l.upgrade_id) {
+                j["upgrade_id"] = *l.upgrade_id;
+            }
+
+            if (l.coord) {
+                j["coord"] = *l.coord;
+            }
+
+            if (l.marker) {
+                j["marker"] = *l.marker;
+            }
+        }
+
+        inline void from_json(const nlohmann::json& j, Location& l) {
+            j.at("id").get_to(l.id);
+            j.at("name").get_to(l.name);
+            j.at("sector_id").get_to(l.sector_id);
+            j.at("type").get_to(l.type);
+            j.at("map_type").get_to(l.map_type);
+            j.at("map_id").get_to(l.map_id);
+            j.at("chat_link").get_to(l.chat_link);
+
+            if (j.contains("label_coord")) {
+                j.at("label_coord").get_to(l.label_coord);
+            }
+
+            if (j.contains("upgrade_id")) {
+                l.upgrade_id = j.at("upgrade_id").get<int>();
+            }
+            else {
+                l.upgrade_id = std::nullopt;
+            }
+
+            if (j.contains("coord")) {
+                l.coord = j.at("coord").get<std::vector<double>>();
+            }
+            else {
+                l.coord = std::nullopt;
+            }
+
+            if (j.contains("marker")) {
+                l.marker = j.at("marker").get<std::string>();
+            }
+            else {
+                l.marker = std::nullopt;
+            }
+        }
+
         struct Scores {
             int red;
             int blue;

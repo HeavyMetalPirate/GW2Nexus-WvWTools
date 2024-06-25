@@ -52,18 +52,41 @@ inline void from_json(const json& j, AccountSettings& s) {
     j.at("hasCommitment").get_to(s.hasCommitment);
 }
 
+struct WidgetSettings {
+    bool render;
+    Position position;
+    bool sameLine;
+    int width;
+    int alignment;
+    int teamnameMode;
+};
+inline void to_json(json& j, const WidgetSettings& settings) {
+    j = json{
+        {"render", settings.render},
+        {"sameLine", settings.sameLine},
+        {"position", settings.position},
+        {"width", settings.width},
+        {"alignment", settings.alignment},
+        {"teamnameMode", settings.teamnameMode}
+    };
+}
+inline void from_json(const json& j, WidgetSettings& settings) {
+    j.at("render").get_to(settings.render);
+    j.at("sameLine").get_to(settings.sameLine);
+    j.at("position").get_to(settings.position);
+    j.at("width").get_to(settings.width);
+    j.at("alignment").get_to(settings.alignment);
+    j.at("teamnameMode").get_to(settings.teamnameMode);
+}
+
 struct Settings {
     std::map<std::string, AccountSettings> accountSettings;
 
-    // display settings
-    bool renderAutoPipsResult;
-    Position autoPipsPosition;
-    int autoPipsWidth;
-    int autoPipsAlignment;
-    bool renderKillDeathRatio;
-    Position killDeathPosition;
-    bool renderKDSameLine;
+    WidgetSettings autoPips;
+    WidgetSettings killDeath;
+    WidgetSettings victoryPoints;
 
+    // specific settings per widget
     std::string autoPipsDisplayFormat;
     std::string autoPipsDoneText;
 };
@@ -73,13 +96,9 @@ struct Settings {
 inline void to_json(json& j, const Settings& settings) {
     j = json{
         {"accountSettings", settings.accountSettings},
-        {"renderAutoPipsResult", settings.renderAutoPipsResult},
-        {"autoPipsPosition", settings.autoPipsPosition},
-        {"autoPipsAlignment", settings.autoPipsAlignment},
-        {"autoPipsWidth", settings.autoPipsWidth},
-        {"renderKillDeathRatio", settings.renderKillDeathRatio},
-        {"killDeathPosition", settings.killDeathPosition},
-        {"renderKDSameLine", settings.renderKDSameLine},
+        {"autoPipsWidget", settings.autoPips},
+        {"killDeathWidget", settings.killDeath},
+        {"victoryPointsWidget", settings.victoryPoints},
         {"autoPipsDisplayFormat", settings.autoPipsDisplayFormat},
         {"autoPipsDoneText", settings.autoPipsDoneText}
     };
@@ -87,27 +106,20 @@ inline void to_json(json& j, const Settings& settings) {
 
 // Function to populate the struct from JSON
 inline void from_json(const json& j, Settings& s) {
-
     if(j.contains("accountSettings"))
         j.at("accountSettings").get_to(s.accountSettings);
-    if(j.contains("renderAutoPipsResult"))
-        j.at("renderAutoPipsResult").get_to(s.renderAutoPipsResult);
-    if (j.contains("autoPipsPosition"))
-        j.at("autoPipsPosition").get_to(s.autoPipsPosition);
-    if (j.contains("renderKillDeathRatio"))
-        j.at("renderKillDeathRatio").get_to(s.renderKillDeathRatio);
-    if (j.contains("killDeathPosition"))
-        j.at("killDeathPosition").get_to(s.killDeathPosition);
-    if (j.contains("renderKDSameLine"))
-        j.at("renderKDSameLine").get_to(s.renderKDSameLine);
+
+    if (j.contains("autoPipsWidget"))
+        j.at("autoPipsWidget").get_to(s.autoPips);
+    if (j.contains("killDeathWidget"))
+        j.at("killDeathWidget").get_to(s.killDeath);
+    if (j.contains("victoryPointsWidget"))
+        j.at("victoryPointsWidget").get_to(s.victoryPoints);
+
     if (j.contains("autoPipsDisplayFormat"))
         j.at("autoPipsDisplayFormat").get_to(s.autoPipsDisplayFormat);
     if (j.contains("autoPipsDoneText"))
         j.at("autoPipsDoneText").get_to(s.autoPipsDoneText);
-    if (j.contains("autoPipsWidth"))
-        j.at("autoPipsWidth").get_to(s.autoPipsWidth);
-    if (j.contains("autoPipsAlignment"))
-        j.at("autoPipsAlignment").get_to(s.autoPipsAlignment);
 }
 
 inline system_clock::time_point string_to_time_point(const std::string& s) {
@@ -124,5 +136,6 @@ inline bool compare_times(std::string one, std::string other) {
 
 // temporary settings - no storage
 extern bool renderPipsCalculator;
+extern bool renderMatchExplorer;
 
 #endif

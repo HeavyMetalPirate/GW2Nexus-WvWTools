@@ -31,9 +31,12 @@ void HandleArcEventLocal(void* eventArgs);
 void HandleIdentityChanged(void* eventArgs);
 void HandleAccountName(void* eventArgs);
 void HandleSelfJoin(void* eventArgs);
+void HandleSquadJoin(void* eventArgs);
+void HandleSquadLeave(void* eventArgs);
 // Settings
 void LoadSettings();
 void StoreSettings();
+void renderWidgetPropertiesTable(const char* id, WidgetSettings* widgetSettings, bool hasMultiLine, bool hasTeamNames);
 
 
 /* globals */
@@ -43,6 +46,7 @@ AddonAPI* APIDefs			= nullptr;
 NexusLinkData* NexusLink	= nullptr;
 Mumble::Data* MumbleLink	= nullptr;
 gw2api::wvw::Match* match	= nullptr;
+Texture* iconNotification   = nullptr;
 
 bool unloading = false;
 std::string accountName = "";
@@ -54,12 +58,14 @@ Renderer renderer;
 AutoPipsCalculator autoPipsCalculator;
 WorldInventory worldInventory;
 WvWMatchService matchService;
+GuildInfoService guildInfo;
 
 /* settings */
 Settings settings = {};
 
 /* temporary settings */
 bool renderPipsCalculator = false;
+bool renderMatchExplorer = false;
 bool showServerSelection = false;
 bool showOverrideAutoCalc = false;
 
@@ -90,8 +96,8 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "WvW Toolbox";	
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 2;
-	AddonDef.Version.Build = 1;
+	AddonDef.Version.Minor = 3;
+	AddonDef.Version.Build = 0;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "HeavyMetalPirate.2695";
 	AddonDef.Description = "Tools to enhance your World vs. World experience.";
@@ -127,12 +133,15 @@ void AddonLoad(AddonAPI* aApi)
 	worldInventory = WorldInventory();
 	renderer = Renderer();
 	matchService = WvWMatchService();
+	guildInfo = GuildInfoService();
+	guildInfo.setAPIDefs(APIDefs);
 
 	initializeAlliances();
 	LoadSettings();
 	
 	// start Match Service auto load
 	matchService.startThread();
+	guildInfo.startLoaderThread();
 
 	// SimpleShortcut
 	APIDefs->AddSimpleShortcut(ADDON_NAME, AddonSimpleShortcut);
@@ -142,6 +151,8 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->SubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
 	APIDefs->SubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
 	APIDefs->SubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
+	APIDefs->SubscribeEvent("EV_ARCDPS_SQUAD_JOIN", HandleSquadJoin);
+	APIDefs->SubscribeEvent("EV_ARCDPS_SQUAD_LEAVE", HandleSquadLeave);
 
 	// Add an options window and a regular render callback
 	APIDefs->RegisterRender(ERenderType_PreRender, AddonPreRender);
@@ -149,7 +160,8 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->RegisterRender(ERenderType_PostRender, AddonPostRender);
 	APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
 
-	APIDefs->RaiseEventNotification("EV_REQUEST_ACCOUNT_NAME");
+	APIDefs->RaiseEventNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
+	APIDefs->RaiseEventNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#00ff00>WvWToolbox</c> was loaded.");
 }
@@ -164,6 +176,7 @@ void AddonUnload()
 	
 	// Stop match service thread
 	matchService.stopThread();
+	guildInfo.stopLoaderThread();
 
 	/* let's clean up after ourselves */
 	APIDefs->RemoveSimpleShortcut(ADDON_NAME);
@@ -171,7 +184,9 @@ void AddonUnload()
 	APIDefs->UnsubscribeEvent("EV_ARCDPS_COMBATEVENT_LOCAL_RAW", HandleArcEventLocal);
 	APIDefs->UnsubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
 	APIDefs->UnsubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
-	APIDefs->UnsubscribeEvent("EV_ARCDPS_SELF_JOIN", nullptr);
+	APIDefs->UnsubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
+	APIDefs->UnsubscribeEvent("EV_ARCDPS_SQUAD_JOIN", HandleSquadJoin);
+	APIDefs->UnsubscribeEvent("EV_ARCDPS_SQUAD_LEAVE", HandleSquadLeave);
 
 	APIDefs->DeregisterRender(AddonPreRender);
 	APIDefs->DeregisterRender(AddonRender);
@@ -274,24 +289,18 @@ void AddonOptions()
 		}
 	}
 
-	ImGui::Separator();
+	ThickSeparator(3.0f, 1.0f);
+
 	ImGui::Text("Functions");
-	ImGui::Checkbox("Show K/D of current match", &settings.renderKillDeathRatio);
-	ImGui::SameLine();
-	ImGui::Checkbox("Horizontal mode", &settings.renderKDSameLine);
-	if (ImGui::BeginTable("##KDProps", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex(0);
-		ImGui::InputInt("Position (X)", &settings.killDeathPosition.x);
-		ImGui::TableSetColumnIndex(1);
-		ImGui::InputInt("Position (Y)", &settings.killDeathPosition.y);
+	ImGui::Checkbox("Show K/D of current match", &settings.killDeath.render);
+	renderWidgetPropertiesTable("##KillDeathProps", &settings.killDeath, true, true);
 
+	ImGui::Separator();
+	ImGui::Checkbox("Show Victory Points of current match", &settings.victoryPoints.render);
+	renderWidgetPropertiesTable("##VictoryPointsProps", &settings.victoryPoints, true, true);
 
-		ImGui::EndTable();
-	}
-
-
-	ImGui::Checkbox("Show automated calculation result", &settings.renderAutoPipsResult);
+	ImGui::Separator();
+	ImGui::Checkbox("Show automated calculation result", &settings.autoPips.render);
 	char bufferAutoPipsFormat[256];
 	strncpy_s(bufferAutoPipsFormat, settings.autoPipsDisplayFormat.c_str(), sizeof(bufferAutoPipsFormat));
 	if (ImGui::InputText("AutoCalc Display Format", bufferAutoPipsFormat, sizeof(bufferAutoPipsFormat))) {
@@ -306,27 +315,7 @@ void AddonOptions()
 		settings.autoPipsDoneText = bufferAutoPipsDone;
 		StoreSettings();
 	}
-	if (ImGui::BeginTable("##AutoPipsProps", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex(0);
-		ImGui::InputInt("Position (X)", &settings.autoPipsPosition.x);
-		ImGui::TableSetColumnIndex(1);
-		ImGui::InputInt("Position (Y)", &settings.autoPipsPosition.y);
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex(0);
-		ImGui::InputInt("Width", &settings.autoPipsWidth);
-		ImGui::TableSetColumnIndex(1);
-		static const char* textAlignComboItems[3];
-		textAlignComboItems[0] = "Center";
-		textAlignComboItems[1] = "Left";
-		textAlignComboItems[2] = "Right";
-		if (ImGui::Combo("Alignment", &settings.autoPipsAlignment, textAlignComboItems, IM_ARRAYSIZE(textAlignComboItems))) {
-			StoreSettings();
-		}
-
-		ImGui::EndTable();
-	}
-
+	renderWidgetPropertiesTable("##AutoPipsProps", &settings.autoPips, false, false);
 
 	if (ImGui::CollapsingHeader("AutoPipsCalculator explained")) {
 		ImGui::TextWrapped("The AutoPipsCalculator is an approximation to the time remaining based on your gameplay and performance of your alliance.");
@@ -357,7 +346,7 @@ void AddonOptions()
 			case 7: rankname = "Legend"; break;
 			default: rankname = "unknown";
 			}
-			ImGui::TextUnformatted(rankname.c_str()); // TODO translate to 0=wood/1=bronze/2=silver/etc.
+			ImGui::TextUnformatted(rankname.c_str());
 
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
@@ -373,13 +362,25 @@ void AddonOptions()
 
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextUnformatted("Commander:");
+			ImGui::TextUnformatted("Commander Status:");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::TextUnformatted(autoPipsCalculator.taggedUp ? "Yes" : "No");
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::TextUnformatted("Squad Size:");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::TextUnformatted(std::to_string(autoPipsCalculator.squadSize).c_str());
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::TextUnformatted("Commander Bonus:");
 			ImGui::TableSetColumnIndex(1);
 			ImGui::TextUnformatted(autoPipsCalculator.commander ? "Yes" : "No");
 
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::TextUnformatted("Public Commander:");
+			ImGui::TextUnformatted("Public Commander Bonus:");
 			ImGui::TableSetColumnIndex(1);
 			ImGui::TextUnformatted(autoPipsCalculator.publicCommander ? "Yes" : "No");
 
@@ -424,10 +425,50 @@ void AddonOptions()
 	}
 }
 
-void AddonSimpleShortcut() {
-	if (ImGui::Checkbox("Pips Calculator", &renderPipsCalculator)) {
+void renderWidgetPropertiesTable(const char* id, WidgetSettings* widgetSettings, bool hasMultiLine, bool hasTeamNames) {
+	static const char* textAlignComboItems[3];
+	textAlignComboItems[0] = "Center";
+	textAlignComboItems[1] = "Left";
+	textAlignComboItems[2] = "Right";
+	static const char* teamNameComboItems[3];
+	teamNameComboItems[0] = "Alliance";
+	teamNameComboItems[1] = "Color";
+	teamNameComboItems[2] = "None";
+	
+	if (ImGui::BeginTable(id, 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::InputInt("Position (X)", &widgetSettings->position.x);
+		ImGui::TableSetColumnIndex(1);
+		ImGui::InputInt("Position (Y)", &widgetSettings->position.y);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::InputInt("Width (0 = auto)", &widgetSettings->width);
+		ImGui::TableSetColumnIndex(1);
+		if (ImGui::Combo("Alignment", &widgetSettings->alignment, textAlignComboItems, IM_ARRAYSIZE(textAlignComboItems))) {
+			StoreSettings();
+		}
 
+		if (hasMultiLine || hasTeamNames) {
+			ImGui::TableNextRow();
+			if (hasTeamNames) {
+				ImGui::TableNextColumn();
+				if (ImGui::Combo(id, &widgetSettings->teamnameMode, teamNameComboItems, IM_ARRAYSIZE(teamNameComboItems))) {
+					StoreSettings();
+				}
+			}
+			if (hasMultiLine) {
+				ImGui::TableNextColumn();
+				ImGui::Checkbox("Horizontal", &widgetSettings->sameLine);
+			}
+		}
+		ImGui::EndTable();
 	}
+}
+
+void AddonSimpleShortcut() {
+	ImGui::Checkbox("Pips Calculator", &renderPipsCalculator);	
+	ImGui::Checkbox("Match Explorer", &renderMatchExplorer);
 }
 
 void AddonPreRender() {
@@ -541,6 +582,33 @@ void LoadSettings() {
 				autoPipsCalculator.setPipsProgress(settings.accountSettings[accountName].pipsProgressed);
 				autoPipsCalculator.commitment = settings.accountSettings[accountName].hasCommitment;
 			}
+
+			// Migrate widget settings to new structure
+			// Existence of any of the legacy settings indicates old format so translate it
+			if (jsonData.contains("autoPipsPosition")) {
+				WidgetSettings autoPips = {
+					jsonData["renderAutoPipsResult"].get<bool>(),
+					{jsonData["autoPipsPosition"]["x"].get<int>(), jsonData["autoPipsPosition"]["y"].get<int>()},
+					false,
+					jsonData["autoPipsWidth"].get<int>(),
+					0,
+					0
+				};
+				settings.autoPips = autoPips;
+			}
+			if (jsonData.contains("killDeathPosition")) {
+				WidgetSettings killDeath = {
+					jsonData["renderKillDeathRatio"].get<bool>(),
+					{jsonData["killDeathPosition"]["x"].get<int>(), jsonData["killDeathPosition"]["y"].get<int>()},
+					jsonData["renderKDSameLine"].get<bool>(),
+					300,
+					0,
+					0
+				};
+				settings.killDeath = killDeath;
+			}
+
+			StoreSettings();
 		}
 	}
 	else {
@@ -557,13 +625,9 @@ void LoadSettings() {
 					}
 				}
 			},
-			false,
-			{50,50},
-			300,
-			0,
-			false,
-			{50,50},
-			false,
+			{false, {50,50}, 0, 300, 0, 0},
+			{false, {50,50}, 0, 300, 0, 0},
+			{false, {50,50}, 0, 300, 0, 0},
 			"per TicK: @p, done: @d of 1450, tickets: @t of 365, remaining: @r",
 			"Done for the week, see you at reset!"
 		};
@@ -601,8 +665,7 @@ void StoreSettings() {
 void HandleIdentityChanged(void* anEventArgs) {
 	Mumble::Identity* identity = (Mumble::Identity*)anEventArgs;
 	if (identity == nullptr) return;
-	autoPipsCalculator.commander = identity->IsCommander;
-	autoPipsCalculator.publicCommander = identity->IsCommander;
+	autoPipsCalculator.taggedUp = identity->IsCommander;
 }
 
 void HandleAccountName(void* eventArgs) {
@@ -650,4 +713,13 @@ void HandleSelfJoin(void* eventArgs) {
 	autoPipsCalculator.commitment = settings.accountSettings[accountName].hasCommitment;
 
 	StoreSettings();
+}
+
+void HandleSquadJoin(void* eventArgs) {
+	EvAgentUpdate* ev = (EvAgentUpdate*)eventArgs;
+	autoPipsCalculator.addPlayerToSquad(std::string(ev->account));
+}
+void HandleSquadLeave(void* eventArgs) {
+	EvAgentUpdate* ev = (EvAgentUpdate*)eventArgs;
+	autoPipsCalculator.removePlayerFromSquad(std::string(ev->account));
 }

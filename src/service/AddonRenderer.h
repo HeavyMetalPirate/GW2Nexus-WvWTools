@@ -2,6 +2,7 @@
 #define ADDON_RENDERER_H
 
 #include "../Globals.h"
+#include "GuildInfoService.h"
 
 class Renderer {
 public:
@@ -10,6 +11,7 @@ public:
 	void postRender();
 
 	void unload();
+private: 
 };
 
 #endif
