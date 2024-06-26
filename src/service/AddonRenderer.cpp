@@ -21,6 +21,8 @@ bool showOwnedByRed = true;
 bool showOwnedByGreen = true;
 bool showOwnedByBlue = true;
 
+int redTeamId, greenTeamId, blueTeamId;
+
 PipsCalculator calculator = PipsCalculator();
 PipsResult result = calculator.calculate();
 PipsResult autoResult = autoPipsCalculator.calculate();
@@ -32,6 +34,22 @@ ImVec4 colorBlue = ImVec4(0, 0.5, 1, 1);
 void Renderer::preRender() {
 	if(iconNotification == nullptr)
 		iconNotification = APIDefs->GetTexture(ICON_NOTIFICATION);
+
+	if (redTeamId == 0) {
+		for (auto id : match->all_worlds["red"]) {
+			if (id - 10000 > 0) { redTeamId = id; break; }
+		}
+	}
+	if (greenTeamId == 0) {
+		for (auto id : match->all_worlds["green"]) {
+			if (id - 10000 > 0) { greenTeamId = id; break; }
+		}
+	}
+	if (blueTeamId == 0) {
+		for (auto id : match->all_worlds["blue"]) {
+			if (id - 10000 > 0) { blueTeamId = id; break; }
+		}
+	}
 }
 void Renderer::render() {
 	pipsCalculator();
@@ -55,11 +73,6 @@ void victoryPoints() {
 	if (match == nullptr) return;
 	if (!NexusLink->IsGameplay) return;
 	if (MumbleLink->Context.IsMapOpen) return;
-
-	int redTeamId, greenTeamId, blueTeamId;
-	redTeamId = match->all_worlds["red"][0];
-	greenTeamId = match->all_worlds["green"][0];
-	blueTeamId = match->all_worlds["blue"][0];
 
 	std::string teamNameRed, teamNameBlue, teamNameGreen;
 	switch (settings.victoryPoints.teamnameMode) {
@@ -202,10 +215,6 @@ void matchExplorer() {
 		return;
 	}
 	AccountSettings as = accountName.empty() ? settings.accountSettings[genericAccount] : settings.accountSettings[accountName];
-	int redTeamId, greenTeamId, blueTeamId;
-	redTeamId = match->all_worlds["red"][0];
-	greenTeamId = match->all_worlds["green"][0];
-	blueTeamId = match->all_worlds["blue"][0];
 
 	// Current skirmish data
 	auto currentSkirmish = match->skirmishes[match->skirmishes.size() - 1];
@@ -592,10 +601,6 @@ void killDeathRatio() {
 	if (greenDeaths > 0) { greenKD = static_cast<float>(greenKills) / static_cast<float>(greenDeaths); }
 	else { greenKD = static_cast<float>(greenKills); }
 	
-	int redTeamId, greenTeamId, blueTeamId;
-	redTeamId = match->all_worlds["red"][0];
-	greenTeamId = match->all_worlds["green"][0];
-	blueTeamId = match->all_worlds["blue"][0];
 	std::string teamNameRed, teamNameBlue, teamNameGreen;
 	switch (settings.killDeath.teamnameMode) {
 	case 0:

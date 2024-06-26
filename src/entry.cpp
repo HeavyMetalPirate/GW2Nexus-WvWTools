@@ -98,7 +98,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 3;
 	AddonDef.Version.Build = 0;
-	AddonDef.Version.Revision = 0;
+	AddonDef.Version.Revision = 1;
 	AddonDef.Author = "HeavyMetalPirate.2695";
 	AddonDef.Description = "Tools to enhance your World vs. World experience.";
 	AddonDef.Load = AddonLoad;

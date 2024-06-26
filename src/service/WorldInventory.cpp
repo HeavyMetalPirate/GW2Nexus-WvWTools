@@ -32,10 +32,16 @@ void WorldInventory::addObjectives(std::vector<gw2api::wvw::Location> objectives
 
 		// Sanitize objectives
 		int redTeamId, greenTeamId, blueTeamId;
-		redTeamId = match->all_worlds["red"][0];
-		greenTeamId = match->all_worlds["green"][0];
-		blueTeamId = match->all_worlds["blue"][0];
-		
+		for (auto id : match->all_worlds["red"]) {
+			if (id - 10000 > 0) { redTeamId = id; break; }
+		}
+		for (auto id : match->all_worlds["blue"]) {
+			if (id - 10000 > 0) { blueTeamId = id; break; }
+		}
+		for (auto id : match->all_worlds["green"]) {
+			if (id - 10000 > 0) { greenTeamId = id; break; }
+		}
+
 		// sectors RBL blue: 1311; sectors red: 1343; sectors green: 1350
 		// sectors BBL blue: 976, 980; sectors red: 977?; sectors green: 974? << verify red and green because I got blue again... T_T
 		// sectors GBL blue: 1000; sectors red: 997; sectors green: 992, 993
