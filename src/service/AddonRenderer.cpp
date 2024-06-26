@@ -35,6 +35,8 @@ void Renderer::preRender() {
 	if(iconNotification == nullptr)
 		iconNotification = APIDefs->GetTexture(ICON_NOTIFICATION);
 
+	if (match == nullptr) return;
+
 	if (redTeamId == 0) {
 		for (auto id : match->all_worlds["red"]) {
 			if (id - 10000 > 0) { redTeamId = id; break; }
