@@ -96,9 +96,9 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "WvW Toolbox";	
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 3;
+	AddonDef.Version.Minor = 4;
 	AddonDef.Version.Build = 0;
-	AddonDef.Version.Revision = 1;
+	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "HeavyMetalPirate.2695";
 	AddonDef.Description = "Tools to enhance your World vs. World experience.";
 	AddonDef.Load = AddonLoad;
@@ -300,6 +300,10 @@ void AddonOptions()
 	renderWidgetPropertiesTable("##VictoryPointsProps", &settings.victoryPoints, true, true);
 
 	ImGui::Separator();
+	ImGui::Checkbox("Show Skirmish score", &settings.skirmishScore.render);
+	renderWidgetPropertiesTable("##SkirmishScoreProps", &settings.skirmishScore, true, true);
+
+	ImGui::Separator();
 	ImGui::Checkbox("Show automated calculation result", &settings.autoPips.render);
 	char bufferAutoPipsFormat[256];
 	strncpy_s(bufferAutoPipsFormat, settings.autoPipsDisplayFormat.c_str(), sizeof(bufferAutoPipsFormat));
@@ -426,10 +430,12 @@ void AddonOptions()
 }
 
 void renderWidgetPropertiesTable(const char* id, WidgetSettings* widgetSettings, bool hasMultiLine, bool hasTeamNames) {
-	static const char* textAlignComboItems[3];
+	static const char* textAlignComboItems[4];
 	textAlignComboItems[0] = "Center";
 	textAlignComboItems[1] = "Left";
 	textAlignComboItems[2] = "Right";
+	textAlignComboItems[3] = "Block";
+
 	static const char* teamNameComboItems[3];
 	teamNameComboItems[0] = "Alliance";
 	teamNameComboItems[1] = "Color";
@@ -625,6 +631,7 @@ void LoadSettings() {
 					}
 				}
 			},
+			{false, {50,50}, 0, 300, 0, 0},
 			{false, {50,50}, 0, 300, 0, 0},
 			{false, {50,50}, 0, 300, 0, 0},
 			{false, {50,50}, 0, 300, 0, 0},

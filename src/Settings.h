@@ -85,6 +85,7 @@ struct Settings {
     WidgetSettings autoPips;
     WidgetSettings killDeath;
     WidgetSettings victoryPoints;
+    WidgetSettings skirmishScore;
 
     // specific settings per widget
     std::string autoPipsDisplayFormat;
@@ -99,6 +100,7 @@ inline void to_json(json& j, const Settings& settings) {
         {"autoPipsWidget", settings.autoPips},
         {"killDeathWidget", settings.killDeath},
         {"victoryPointsWidget", settings.victoryPoints},
+        {"skirmishScoreWidget", settings.skirmishScore},
         {"autoPipsDisplayFormat", settings.autoPipsDisplayFormat},
         {"autoPipsDoneText", settings.autoPipsDoneText}
     };
@@ -115,6 +117,8 @@ inline void from_json(const json& j, Settings& s) {
         j.at("killDeathWidget").get_to(s.killDeath);
     if (j.contains("victoryPointsWidget"))
         j.at("victoryPointsWidget").get_to(s.victoryPoints);
+    if (j.contains("skirmishScoreWidget"))
+        j.at("skirmishScoreWidget").get_to(s.skirmishScore);
 
     if (j.contains("autoPipsDisplayFormat"))
         j.at("autoPipsDisplayFormat").get_to(s.autoPipsDisplayFormat);

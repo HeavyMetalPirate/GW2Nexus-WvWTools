@@ -6,8 +6,23 @@ void matchExplorer();
 void autoPipsResult();
 void killDeathRatio();
 void victoryPoints();
+void skirmishScore();
+
+/* utility protos */
 void drawSkirmishCard(gw2api::wvw::Skirmish* skirmish);
 std::string convertMinutesToHoursAndMinutes(int totalMinutes);
+
+/* widget render utility proto */
+void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue);
+void renderHorizontalLeft(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
+void renderVerticalLeft(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize);
+void renderHorizontalCenter(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
+void renderVerticalCenter(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize);
+void renderHorizontalRight(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
+void renderVerticalRight(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize);
+void renderHorizontalBlock(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
+void renderVerticalBlock(std::vector<std::pair<std::string, std::string>> values, ImVec2 widgetSize);
+
 
 std::string mapFilterText;
 bool showCamps = true;
@@ -54,10 +69,15 @@ void Renderer::preRender() {
 	}
 }
 void Renderer::render() {
+	// render functions that don't need live data
 	pipsCalculator();
+
+	// render functions that need live data
+	if (match == nullptr) return;
 	autoPipsResult();
 	killDeathRatio();
 	victoryPoints();
+	skirmishScore();
 	matchExplorer();
 }
 void Renderer::postRender() {
@@ -69,142 +89,51 @@ void Renderer::unload() {
 }
 
 //========================================================
+void skirmishScore() {
+	auto currentSkirmish = match->skirmishes[match->skirmishes.size() - 1];
+	std::string scoreRed = std::to_string(currentSkirmish.scores.red);
+	std::string scoreBlue = std::to_string(currentSkirmish.scores.blue);
+	std::string scoreGreen = std::to_string(currentSkirmish.scores.green);
+
+	renderScoreWidget("Skirmish Score", settings.skirmishScore, scoreRed, scoreGreen, scoreBlue);
+}
+
 void victoryPoints() {
-	if (!settings.victoryPoints.render) return;
-	if (!isInWvW()) return;
-	if (match == nullptr) return;
-	if (!NexusLink->IsGameplay) return;
-	if (MumbleLink->Context.IsMapOpen) return;
+	std::string scoreRed = std::to_string(match->victory_points.red);
+	std::string scoreBlue = std::to_string(match->victory_points.blue);
+	std::string scoreGreen = std::to_string(match->victory_points.green);
 
-	std::string teamNameRed, teamNameBlue, teamNameGreen;
-	switch (settings.victoryPoints.teamnameMode) {
-	case 0:
-		teamNameRed = worldInventory.getAlliance(redTeamId)->name + ": ";
-		teamNameBlue = worldInventory.getAlliance(blueTeamId)->name + ": ";
-		teamNameGreen = worldInventory.getAlliance(greenTeamId)->name + ": ";
-		break;
-	case 1:
-		teamNameRed = "Red: ";
-		teamNameBlue = "Blue: ";
-		teamNameGreen = "Green: ";
-		break;
-	case 2:
-	default:
-		teamNameRed = "";
-		teamNameBlue = "";
-		teamNameGreen = "";
-	}
+	renderScoreWidget("Victory Points", settings.victoryPoints, scoreRed, scoreGreen, scoreBlue);
+}
 
-	std::string textRed = teamNameRed + std::to_string(match->victory_points.red);
-	std::string textBlue = teamNameBlue + std::to_string(match->victory_points.blue);
-	std::string textGreen = teamNameGreen + std::to_string(match->victory_points.green);
 
-	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
-	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
-	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+void killDeathRatio() {
+	int redKills, redDeaths;
+	int blueKills, blueDeaths;
+	int greenKills, greenDeaths;
 
-	ImVec2 textSize;
-	if (sizeRed.x > sizeBlue.x && sizeRed.x > sizeGreen.x) {
-		textSize = sizeRed;
-	}
-	else if (sizeBlue.x > sizeRed.x && sizeBlue.x > sizeGreen.x) {
-		textSize = sizeBlue;
-	}
-	else {
-		textSize = sizeGreen;
-	}
+	redKills = match->kills.red;
+	redDeaths = match->deaths.red;
+	blueKills = match->kills.blue;
+	blueDeaths = match->deaths.blue;
+	greenKills = match->kills.green;
+	greenDeaths = match->deaths.green;
 
-	ImVec2 widgetPos = ImVec2(static_cast<float>(settings.victoryPoints.position.x), static_cast<float>(settings.victoryPoints.position.y));
-	ImVec2 widgetSize = ImVec2(static_cast<float>(settings.victoryPoints.width), settings.victoryPoints.sameLine ? (ImGui::GetTextLineHeightWithSpacing()) : (3 * ImGui::GetTextLineHeightWithSpacing()));
-		//settings.victoryPoints.sameLine ? (textSize.y + 2 * ImGui::GetTextLineHeightWithSpacing()) : (textSize.y + 4 * ImGui::GetTextLineHeightWithSpacing()));
-	if (widgetSize.x <= 0) {
-		if (settings.victoryPoints.sameLine) {
-			widgetSize.x = sizeBlue.x + sizeRed.x + sizeGreen.x + (2* ImGui::CalcTextSize(" ").x);
-		}
-		else {
-			widgetSize.x = textSize.x;
-		}
-	}
-	if (widgetPos.x <= 0) {
-		widgetPos.x = 0;
-	}
-	if (widgetPos.y <= 0) {
-		widgetPos.y = 0;
-	}
-	ImGui::SetNextWindowPos(widgetPos);
-	ImGui::SetNextWindowSize(widgetSize);
+	float redKD;
+	if (redDeaths > 0) { redKD = static_cast<float>(redKills) / static_cast<float>(redDeaths); }
+	else { redKD = static_cast<float>(redKills); }
+	float blueKD;
+	if (blueDeaths > 0) { blueKD = static_cast<float>(blueKills) / static_cast<float>(blueDeaths); }
+	else { blueKD = static_cast<float>(blueKills); }
+	float greenKD;
+	if (greenDeaths > 0) { greenKD = static_cast<float>(greenKills) / static_cast<float>(greenDeaths); }
+	else { greenKD = static_cast<float>(greenKills); }
 
-	if (ImGui::Begin("Victory Points", nullptr, ImGuiWindowFlags_AlwaysAutoResize
-												| ImGuiWindowFlags_NoTitleBar
-												| ImGuiWindowFlags_NoInputs
-												| ImGuiWindowFlags_NoScrollbar)) {
+	std::string scoreRed = std::format("{:.2f}", redKD);
+	std::string scoreGreen = std::format("{:.2f}", greenKD);
+	std::string scoreBlue = std::format("{:.2f}", blueKD);
 
-		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-		{
-			ImGui::BeginTooltip();
-			ImGui::Text("Victory Points");
-			ImGui::EndTooltip();
-		}
-
-		// TODO set to lineheight
-		//ImGui::SetCursorPosY(0.0f);
-		
-		if (settings.victoryPoints.sameLine) {
-			
-			switch (settings.victoryPoints.alignment) {
-			case 0: // center
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)) / 2);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 1: // left
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 2: // right
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)));
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			}
-		}
-		else {
-			switch (settings.victoryPoints.alignment) {
-			case 0: // center
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x) / 2);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SetCursorPosX((widgetSize.x - sizeGreen.x) / 2);
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SetCursorPosX((widgetSize.x - sizeBlue.x) / 2);
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 1: // left
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 2: // right
-				ImGui::SetCursorPosX(widgetSize.x - sizeRed.x - 5);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SetCursorPosX(widgetSize.x - sizeGreen.x - 5);
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SetCursorPosX(widgetSize.x - sizeBlue.x - 5);
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-
-				break;
-			}
-		}
-		ImGui::End();
-	}
+	renderScoreWidget("K/D Tracker", settings.killDeath, scoreRed, scoreGreen, scoreBlue);
 }
 
 void matchExplorer() {
@@ -250,14 +179,14 @@ void matchExplorer() {
 
 		
 
-		if (now > skirmishEndLocal) {
+		if (possibleStaleData) {
 			if (iconNotification != nullptr) {
 				ImTextureID myTextureID = (ImTextureID)iconNotification->Resource;
 				ImVec2 textureSize = ImVec2(iconNotification->Width, iconNotification->Height);
 				ImGui::Image(myTextureID, textureSize);
 				ImGui::SameLine();
 			}
-			ImGui::TextColored(colorRed, "Skirmish data in GW2 API outdated! Values might not show current state.");
+			ImGui::TextColored(colorRed, "GW2 API data currently stale - values might not show current state.");
 		}
 
 		if(ImGui::BeginTable("##ExplorerTeams", 4)) {
@@ -575,163 +504,6 @@ void matchExplorer() {
 	}
 }
 
-void killDeathRatio() {
-	if (!settings.killDeath.render) return;
-	if (!isInWvW()) return;
-	if (match == nullptr) return;
-	if (!NexusLink->IsGameplay) return;
-	if (MumbleLink->Context.IsMapOpen) return;
-
-	int redKills, redDeaths;
-	int blueKills, blueDeaths;
-	int greenKills, greenDeaths;
-
-	redKills = match->kills.red;
-	redDeaths = match->deaths.red;
-	blueKills = match->kills.blue;
-	blueDeaths = match->deaths.blue;
-	greenKills = match->kills.green;
-	greenDeaths = match->deaths.green;
-
-	float redKD;
-	if (redDeaths > 0) { redKD = static_cast<float>(redKills) / static_cast<float>(redDeaths); }
-	else { redKD = static_cast<float>(redKills); }
-	float blueKD;
-	if (blueDeaths > 0) { blueKD = static_cast<float>(blueKills) / static_cast<float>(blueDeaths); }
-	else { blueKD = static_cast<float>(blueKills); }
-	float greenKD;
-	if (greenDeaths > 0) { greenKD = static_cast<float>(greenKills) / static_cast<float>(greenDeaths); }
-	else { greenKD = static_cast<float>(greenKills); }
-	
-	std::string teamNameRed, teamNameBlue, teamNameGreen;
-	switch (settings.killDeath.teamnameMode) {
-	case 0:
-		teamNameRed = worldInventory.getAlliance(redTeamId)->name + ": ";
-		teamNameBlue = worldInventory.getAlliance(blueTeamId)->name + ": ";
-		teamNameGreen = worldInventory.getAlliance(greenTeamId)->name + ": ";
-		break;
-	case 1:
-		teamNameRed = "Red: ";
-		teamNameBlue = "Blue: ";
-		teamNameGreen = "Green: ";
-		break;
-	case 2:
-	default:
-		teamNameRed = "";
-		teamNameBlue = "";
-		teamNameGreen = "";
-	}
-
-	std::string textRed = teamNameRed + std::format("{:.2f}", redKD);
-	std::string textBlue = teamNameBlue + std::format("{:.2f}", blueKD);
-	std::string textGreen = teamNameGreen + std::format("{:.2f}", greenKD);
-	
-	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
-	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
-	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
-
-	ImVec2 textSize;
-	if (sizeRed.x > sizeBlue.x && sizeRed.x > sizeGreen.x) {
-		textSize = sizeRed;
-	}
-	else if (sizeBlue.x > sizeRed.x && sizeBlue.x > sizeGreen.x) {
-		textSize = sizeBlue;
-	}
-	else {
-		textSize = sizeGreen;
-	}
-
-	ImVec2 widgetPos = ImVec2(static_cast<float>(settings.killDeath.position.x), static_cast<float>(settings.killDeath.position.y));
-	ImVec2 widgetSize = ImVec2(static_cast<float>(settings.killDeath.width), 
-		settings.killDeath.sameLine ? (ImGui::GetTextLineHeightWithSpacing()) : (3 * ImGui::GetTextLineHeightWithSpacing()));
-	if (widgetSize.x <= 0) {
-		if (settings.killDeath.sameLine) {
-			widgetSize.x = sizeBlue.x + sizeRed.x + sizeGreen.x + (2 * ImGui::CalcTextSize(" ").x) + 10;
-		}
-		else {
-			widgetSize.x = textSize.x + 10;
-		}
-	}
-	if (widgetPos.x <= 0) {
-		widgetPos.x = 0;
-	}
-	if (widgetPos.y <= 0) {
-		widgetPos.y = 0;
-	}
-	ImGui::SetNextWindowPos(widgetPos);
-	ImGui::SetNextWindowSize(widgetSize);
-
-	if (ImGui::Begin("K/D Tracker", nullptr, ImGuiWindowFlags_AlwaysAutoResize
-											| ImGuiWindowFlags_NoTitleBar
-											| ImGuiWindowFlags_NoInputs 
-											| ImGuiWindowFlags_NoScrollbar)) {
-
-		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-		{
-			ImGui::BeginTooltip();
-			ImGui::Text("K/D Tracker");
-			ImGui::EndTooltip();
-		}
-		// TODO set it to line height GetTextLineHeightWithSpacing
-		// ImGui::SetCursorPosY(0.0f);
-
-		if (settings.killDeath.sameLine) {
-			switch (settings.killDeath.alignment) {
-			case 0: // center
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)) / 2);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 1: // left
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 2: // right
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)));
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SameLine();
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			}
-		}
-		else {
-			switch (settings.killDeath.alignment) {
-			case 0: // center
-				ImGui::SetCursorPosX((widgetSize.x - sizeRed.x) / 2);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SetCursorPosX((widgetSize.x - sizeGreen.x) / 2);
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SetCursorPosX((widgetSize.x - sizeBlue.x) / 2);
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 1: // left
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-				break;
-			case 2: // right
-				ImGui::SetCursorPosX(widgetSize.x - sizeRed.x - 5);
-				ImGui::TextColored(colorRed, textRed.c_str());
-				ImGui::SetCursorPosX(widgetSize.x - sizeGreen.x - 5);
-				ImGui::TextColored(colorGreen, textGreen.c_str());
-				ImGui::SetCursorPosX(widgetSize.x - sizeBlue.x - 5);
-				ImGui::TextColored(colorBlue, textBlue.c_str());
-
-				break;
-			}
-		}
-		ImGui::End();
-	}
-}
-
 void autoPipsResult() {
 	if (!settings.autoPips.render) return;
 	if (!isInWvW()) return;
@@ -754,7 +526,6 @@ void autoPipsResult() {
 		}
 	}
 
-	// 	//"per TicK: @p, done: @d of 1450, tickets: @t of 365, remaining: @r"
 	replaceAll(text, "@p", std::to_string(autoResult.pipsPerTick));
 	replaceAll(text, "@d", std::to_string(autoResult.finishedPips));
 	replaceAll(text, "@t", std::to_string(autoResult.ticketsEarned));
@@ -764,7 +535,7 @@ void autoPipsResult() {
 	ImVec2 widgetPos = ImVec2(static_cast<float>(settings.autoPips.position.x), static_cast<float>(settings.autoPips.position.y));
 	ImVec2 widgetSize = ImVec2(static_cast<float>(settings.autoPips.width), textSize.y);
 	if (widgetSize.x <= 0) {
-		widgetSize.x = 300;
+		widgetSize.x = ImGui::CalcTextSize(text.c_str()).x;
 	}
 	if (widgetPos.x <= 0) {
 		widgetPos.x = 0;
@@ -785,7 +556,8 @@ void autoPipsResult() {
 			case 0: textX = (widgetSize.x - textSize.x) / 2.0f; break;
 			case 1: textX = 1; break; // extra padding to the left
 			case 2: textX = widgetSize.x - textSize.x - 1; break; // -1 = extra padding to the right
-			default: textX = (widgetSize.x - textSize.x) / 2.0f;
+			case 3: textX = (widgetSize.x - textSize.x) / 2.0f; break; // Block doesn't make sense for this, so use same as 0
+			default: textX = (widgetSize.x - textSize.x) / 2.0f; // fallback
 		}
 
 		ImGui::SetCursorPosX(textX);
@@ -980,4 +752,254 @@ void drawSkirmishCard(gw2api::wvw::Skirmish* skirmish) {
 		ImGui::TableNextColumn();
 		ImGui::Text(std::to_string(mapScore.scores.blue).c_str());
 	}
+}
+
+void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue) {
+	if (!widgetSettings.render) return;
+	if (!isInWvW()) return;
+	if (!NexusLink->IsGameplay) return;
+	if (MumbleLink->Context.IsMapOpen) return;
+
+	std::string teamNameRed, teamNameBlue, teamNameGreen;
+	switch (widgetSettings.teamnameMode) {
+	case 0:
+		teamNameRed = worldInventory.getAlliance(redTeamId)->name + ": ";
+		teamNameBlue = worldInventory.getAlliance(blueTeamId)->name + ": ";
+		teamNameGreen = worldInventory.getAlliance(greenTeamId)->name + ": ";
+		break;
+	case 1:
+		teamNameRed = "Red: ";
+		teamNameBlue = "Blue: ";
+		teamNameGreen = "Green: ";
+		break;
+	case 2:
+	default:
+		teamNameRed = "";
+		teamNameBlue = "";
+		teamNameGreen = "";
+	}
+
+	std::string textRed = teamNameRed + scoreRed;
+	std::string textBlue = teamNameBlue + scoreBlue;
+	std::string textGreen = teamNameGreen + scoreGreen;
+
+	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+
+	ImVec2 textSize;
+	if (sizeRed.x > sizeBlue.x && sizeRed.x > sizeGreen.x) {
+		textSize = sizeRed;
+	}
+	else if (sizeBlue.x > sizeRed.x && sizeBlue.x > sizeGreen.x) {
+		textSize = sizeBlue;
+	}
+	else {
+		textSize = sizeGreen;
+	}
+
+	ImVec2 widgetPos = ImVec2(static_cast<float>(widgetSettings.position.x), static_cast<float>(widgetSettings.position.y));
+	ImVec2 widgetSize = ImVec2(static_cast<float>(widgetSettings.width),
+		widgetSettings.sameLine ? (ImGui::GetTextLineHeightWithSpacing()) : (3 * ImGui::GetTextLineHeightWithSpacing()));
+	if (widgetSize.x <= 0) {
+		if (widgetSettings.sameLine) {
+			widgetSize.x = sizeBlue.x + sizeRed.x + sizeGreen.x + (2 * ImGui::CalcTextSize(" ").x) + 10;
+		}
+		else {
+			widgetSize.x = textSize.x + 10;
+		}
+	}
+	if (widgetPos.x <= 0) {
+		widgetPos.x = 0;
+	}
+	if (widgetPos.y <= 0) {
+		widgetPos.y = 0;
+	}
+
+	if (possibleStaleData && iconNotification != nullptr) {
+		ImVec2 staleWarningPos = ImVec2(widgetPos.x - ImGui::GetTextLineHeightWithSpacing(), widgetPos.y);
+		if (staleWarningPos.x < 0) {
+			staleWarningPos.x = widgetPos.x + widgetSize.x;
+		}
+		ImGui::SetNextWindowPos(staleWarningPos);
+		ImGui::SetNextWindowSize({ ImGui::GetTextLineHeightWithSpacing(), ImGui::GetTextLineHeightWithSpacing() });
+		if (ImGui::Begin((title + "##stale").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize
+			| ImGuiWindowFlags_NoTitleBar
+			| ImGuiWindowFlags_NoMove
+			| ImGuiWindowFlags_NoScrollbar
+			| ImGuiWindowFlags_NoBackground)) {
+
+			ImTextureID myTextureID = (ImTextureID)iconNotification->Resource;
+			ImVec2 textureSize = ImVec2(ImGui::GetTextLineHeightWithSpacing(), ImGui::GetTextLineHeightWithSpacing());
+			ImGui::SetCursorPos({ 0, 0 });
+			ImGui::Image(myTextureID, textureSize);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::BeginTooltip();
+				ImGui::Text("GW2 API data is stale - values might not reflect current state.");
+				ImGui::EndTooltip();
+			}
+			
+			ImGui::End();
+		}
+	}
+
+	ImGui::SetNextWindowPos(widgetPos);
+	ImGui::SetNextWindowSize(widgetSize);
+
+	if (ImGui::Begin(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize
+		| ImGuiWindowFlags_NoTitleBar
+		| ImGuiWindowFlags_NoMove
+		| ImGuiWindowFlags_NoScrollbar)) {
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+		{
+			ImGui::BeginTooltip();
+			ImGui::Text(title.c_str());
+			ImGui::EndTooltip();
+		}
+
+		if (widgetSettings.sameLine) {
+			switch (widgetSettings.alignment) {
+			case 0: // center
+				renderHorizontalCenter(textRed, textGreen, textBlue, widgetSize);
+				break;
+			case 1: // left
+				renderHorizontalLeft(textRed, textGreen, textBlue, widgetSize);
+				break;
+			case 2: // right
+				renderHorizontalRight(textRed, textGreen, textBlue, widgetSize);
+				break;
+			case 3: // Block
+				renderHorizontalBlock(textRed, textGreen, textBlue, widgetSize);
+			}
+		}
+		else {
+			switch (widgetSettings.alignment) {
+			case 0: // center
+				renderVerticalCenter(textRed, textGreen, textBlue, widgetSize);
+				break;
+			case 1: // left
+				renderVerticalLeft(textRed, textGreen, textBlue, widgetSize);
+				break;
+			case 2: // right
+				renderVerticalRight(textRed, textGreen, textBlue, widgetSize);
+
+				break;
+			case 3: // block: left team names, right score
+				renderVerticalBlock({ {teamNameRed, scoreRed}, {teamNameGreen, scoreGreen}, {teamNameBlue, scoreBlue} }, widgetSize);
+			}
+		}
+		ImGui::End();
+	}
+}
+
+
+void renderHorizontalCenter(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+
+	ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)) / 2);
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderVerticalCenter(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+
+	ImGui::SetCursorPosX((widgetSize.x - sizeRed.x) / 2);
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SetCursorPosX((widgetSize.x - sizeGreen.x) / 2);
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SetCursorPosX((widgetSize.x - sizeBlue.x) / 2);
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderHorizontalLeft(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderVerticalLeft(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderHorizontalRight(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+	
+	ImGui::SetCursorPosX((widgetSize.x - sizeRed.x - sizeGreen.x - sizeBlue.x - (2 * ImGui::GetStyle().ItemInnerSpacing.x)));
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SameLine();
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderVerticalRight(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImVec2 sizeRed = ImGui::CalcTextSize(textRed.c_str());
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+	
+	ImGui::SetCursorPosX(widgetSize.x - sizeRed.x - 5);
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SetCursorPosX(widgetSize.x - sizeGreen.x - 5);
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SetCursorPosX(widgetSize.x - sizeBlue.x - 5);
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+
+void renderHorizontalBlock(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize) {
+	ImVec2 sizeBlue = ImGui::CalcTextSize(textBlue.c_str());
+	ImVec2 sizeGreen = ImGui::CalcTextSize(textGreen.c_str());
+	
+	ImGui::TextColored(colorRed, textRed.c_str());
+	ImGui::SameLine();
+	ImGui::SetCursorPosX((widgetSize.x - sizeGreen.x) / 2);
+	ImGui::TextColored(colorGreen, textGreen.c_str());
+	ImGui::SameLine();
+	ImGui::SetCursorPosX((widgetSize.x - sizeBlue.x) - 5);
+	ImGui::TextColored(colorBlue, textBlue.c_str());
+}
+void renderVerticalBlock(std::vector<std::pair<std::string, std::string>> values, ImVec2 widgetSize) {
+	ImVec2 scoreSize;
+	std::string teamNameRed, scoreRed;
+	std::string teamNameBlue, scoreBlue;
+	std::string teamNameGreen, scoreGreen;
+
+	teamNameRed = values.at(0).first;
+	scoreRed = values.at(0).second;
+	teamNameGreen = values.at(1).first;
+	scoreGreen = values.at(1).second;
+	teamNameBlue = values.at(2).first;
+	scoreBlue = values.at(2).second;
+
+	ImGui::TextColored(colorRed, teamNameRed.c_str());
+	ImGui::SameLine();
+	scoreSize = ImGui::CalcTextSize(scoreRed.c_str());
+	ImGui::SetCursorPosX(widgetSize.x - scoreSize.x - 5);
+	ImGui::TextColored(colorRed, scoreRed.c_str());
+
+	ImGui::TextColored(colorGreen, teamNameGreen.c_str());
+	ImGui::SameLine();
+	scoreSize = ImGui::CalcTextSize(scoreGreen.c_str());
+	ImGui::SetCursorPosX(widgetSize.x - scoreSize.x - 5);
+	ImGui::TextColored(colorGreen, scoreGreen.c_str());
+
+	ImGui::TextColored(colorBlue, teamNameBlue.c_str());
+	ImGui::SameLine();
+	scoreSize = ImGui::CalcTextSize(scoreBlue.c_str());
+	ImGui::SetCursorPosX(widgetSize.x - scoreSize.x - 5);
+	ImGui::TextColored(colorBlue, scoreBlue.c_str());
 }

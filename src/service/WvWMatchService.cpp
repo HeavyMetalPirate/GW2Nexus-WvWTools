@@ -2,6 +2,7 @@
 
 bool objectivesLoaded = false;
 bool upgradesLoaded = false;
+bool possibleStaleData = false;
 
 std::chrono::time_point<std::chrono::system_clock> lastUpdate = std::chrono::system_clock::now();
 
@@ -63,6 +64,14 @@ void WvWMatchService::loadMatchData() {
 	if (allianceId == 0) return; // no allianceId selected
 	
 	try {
+		gw2api::wvw::Kills kills;
+		if (match == nullptr) {
+			kills = {0,0,0};
+		}
+		else {
+			kills = gw2api::wvw::Kills(match->kills);
+		}
+		
 		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(allianceId);
 		std::string matchResponse = HTTPClient::GetRequest(url);
 		if (matchResponse == "") {
@@ -71,6 +80,13 @@ void WvWMatchService::loadMatchData() {
 		}
 		json matchJson = json::parse(matchResponse);
 		gw2api::wvw::Match m = matchJson;
+
+		if (kills.red == m.kills.red && kills.blue == m.kills.blue && kills.green == m.kills.green) {
+			possibleStaleData = true;
+		}
+		else {
+			possibleStaleData = false;
+		}
 
 		delete match; // does this even help? idk and SO is snob land
 		match = new gw2api::wvw::Match(m);
