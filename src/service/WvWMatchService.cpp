@@ -81,17 +81,20 @@ void WvWMatchService::loadMatchData() {
 		json matchJson = json::parse(matchResponse);
 		gw2api::wvw::Match m = matchJson;
 
-		if (kills.red == m.kills.red && kills.blue == m.kills.blue && kills.green == m.kills.green) {
-			possibleStaleData = true;
-		}
-		else {
-			possibleStaleData = false;
-		}
-
 		delete match; // does this even help? idk and SO is snob land
 		match = new gw2api::wvw::Match(m);
-
 		setAutoPipsCalculatorValues();
+		if (match != nullptr) {
+			if (kills.red == match->kills.red && kills.blue == match->kills.blue && kills.green == match->kills.green) {
+				possibleStaleData = true;
+			}
+			else {
+				possibleStaleData = false;
+			}
+		}
+		else {
+			possibleStaleData = true;
+		}
 		lastUpdate = std::chrono::system_clock::now();
 	}
 	catch (const std::exception& e) {

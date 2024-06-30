@@ -90,7 +90,9 @@ void Renderer::unload() {
 
 //========================================================
 void skirmishScore() {
-	auto currentSkirmish = match->skirmishes[match->skirmishes.size() - 1];
+	int skirmishIdx = match->skirmishes.size() - 1;
+	if (skirmishIdx < 0 || skirmishIdx >= match->skirmishes.size()) return;
+	auto currentSkirmish = match->skirmishes[skirmishIdx];
 	std::string scoreRed = std::to_string(currentSkirmish.scores.red);
 	std::string scoreBlue = std::to_string(currentSkirmish.scores.blue);
 	std::string scoreGreen = std::to_string(currentSkirmish.scores.green);
@@ -148,7 +150,9 @@ void matchExplorer() {
 	AccountSettings as = accountName.empty() ? settings.accountSettings[genericAccount] : settings.accountSettings[accountName];
 
 	// Current skirmish data
-	auto currentSkirmish = match->skirmishes[match->skirmishes.size() - 1];
+	int skirmishIdx = match->skirmishes.size() - 1;
+	if (skirmishIdx < 0 || skirmishIdx >= match->skirmishes.size()) return;
+	auto currentSkirmish = match->skirmishes[skirmishIdx];
 	std::chrono::time_point matchStart = parse_date(match->start_time);
 	auto duration = std::chrono::hours((currentSkirmish.id - 1) * 2);
 	auto skirmishStart = matchStart + duration;
