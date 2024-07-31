@@ -3,6 +3,11 @@
 bool objectivesLoaded = false;
 bool upgradesLoaded = false;
 bool possibleStaleData = false;
+bool possibleStaleKills = false;
+bool possibleStaleSkirmishScore = false;
+
+int staleKillsCounter = 0;
+int staleSkirmishScoreCounter = 0;
 
 std::chrono::time_point<std::chrono::system_clock> lastUpdate = std::chrono::system_clock::now();
 
@@ -65,11 +70,14 @@ void WvWMatchService::loadMatchData() {
 	
 	try {
 		gw2api::wvw::Kills kills;
+		gw2api::wvw::Scores scores;
 		if (match == nullptr) {
 			kills = {0,0,0};
+			scores = { 0,0,0 };
 		}
 		else {
 			kills = gw2api::wvw::Kills(match->kills);
+			scores = gw2api::wvw::Scores(match->scores);
 		}
 		
 		std::string url = baseUrl + "/v2/wvw/matches?world=" + std::to_string(allianceId);
@@ -86,11 +94,21 @@ void WvWMatchService::loadMatchData() {
 		setAutoPipsCalculatorValues();
 		if (match != nullptr) {
 			if (kills.red == match->kills.red && kills.blue == match->kills.blue && kills.green == match->kills.green) {
-				possibleStaleData = true;
+				staleKillsCounter++;
 			}
 			else {
-				possibleStaleData = false;
+				staleKillsCounter = 0;
 			}
+			if (scores.red == match->scores.red && scores.blue == match->scores.blue && scores.green == match->scores.green) {
+				staleSkirmishScoreCounter++;
+			}
+			else {
+				staleSkirmishScoreCounter = 0;
+			}
+
+			possibleStaleKills = staleKillsCounter > 2;
+			possibleStaleSkirmishScore = staleSkirmishScoreCounter > 2;
+			possibleStaleData = possibleStaleKills || possibleStaleSkirmishScore;
 		}
 		else {
 			possibleStaleData = true;

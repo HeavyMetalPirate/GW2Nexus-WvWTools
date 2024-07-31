@@ -96,7 +96,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "WvW Toolbox";	
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 4;
+	AddonDef.Version.Minor = 5;
 	AddonDef.Version.Build = 0;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "HeavyMetalPirate.2695";
@@ -302,6 +302,8 @@ void AddonOptions()
 	ImGui::Separator();
 	ImGui::Checkbox("Show Skirmish score", &settings.skirmishScore.render);
 	renderWidgetPropertiesTable("##SkirmishScoreProps", &settings.skirmishScore, true, true);
+
+	ImGui::Checkbox("Hide stale data warnings on widgets", &settings.hideStaleDataWarnings);
 
 	ImGui::Separator();
 	ImGui::Checkbox("Show automated calculation result", &settings.autoPips.render);
@@ -631,6 +633,7 @@ void LoadSettings() {
 					}
 				}
 			},
+			false,
 			{false, {50,50}, 0, 300, 0, 0},
 			{false, {50,50}, 0, 300, 0, 0},
 			{false, {50,50}, 0, 300, 0, 0},

@@ -13,7 +13,7 @@ void drawSkirmishCard(gw2api::wvw::Skirmish* skirmish);
 std::string convertMinutesToHoursAndMinutes(int totalMinutes);
 
 /* widget render utility proto */
-void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue);
+void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue, bool staleDataFlag);
 void renderHorizontalLeft(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
 void renderVerticalLeft(std::string textRed, std::string textGreen, std::string textBlue, ImVec2 widgetSize);
 void renderHorizontalCenter(std::string redText, std::string greenText, std::string blueText, ImVec2 widgetSize);
@@ -97,7 +97,7 @@ void skirmishScore() {
 	std::string scoreBlue = std::to_string(currentSkirmish.scores.blue);
 	std::string scoreGreen = std::to_string(currentSkirmish.scores.green);
 
-	renderScoreWidget("Skirmish Score", settings.skirmishScore, scoreRed, scoreGreen, scoreBlue);
+	renderScoreWidget("Skirmish Score", settings.skirmishScore, scoreRed, scoreGreen, scoreBlue, possibleStaleSkirmishScore);
 }
 
 void victoryPoints() {
@@ -105,7 +105,7 @@ void victoryPoints() {
 	std::string scoreBlue = std::to_string(match->victory_points.blue);
 	std::string scoreGreen = std::to_string(match->victory_points.green);
 
-	renderScoreWidget("Victory Points", settings.victoryPoints, scoreRed, scoreGreen, scoreBlue);
+	renderScoreWidget("Victory Points", settings.victoryPoints, scoreRed, scoreGreen, scoreBlue, possibleStaleSkirmishScore);
 }
 
 
@@ -135,7 +135,7 @@ void killDeathRatio() {
 	std::string scoreGreen = std::format("{:.2f}", greenKD);
 	std::string scoreBlue = std::format("{:.2f}", blueKD);
 
-	renderScoreWidget("K/D Tracker", settings.killDeath, scoreRed, scoreGreen, scoreBlue);
+	renderScoreWidget("K/D Tracker", settings.killDeath, scoreRed, scoreGreen, scoreBlue, possibleStaleKills);
 }
 
 void matchExplorer() {
@@ -758,7 +758,7 @@ void drawSkirmishCard(gw2api::wvw::Skirmish* skirmish) {
 	}
 }
 
-void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue) {
+void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::string scoreRed, std::string scoreGreen, std::string scoreBlue, bool staleDataFlag) {
 	if (!widgetSettings.render) return;
 	if (!isInWvW()) return;
 	if (!NexusLink->IsGameplay) return;
@@ -820,7 +820,7 @@ void renderScoreWidget(std::string title, WidgetSettings widgetSettings, std::st
 		widgetPos.y = 0;
 	}
 
-	if (possibleStaleData && iconNotification != nullptr) {
+	if (staleDataFlag && !settings.hideStaleDataWarnings && iconNotification != nullptr) {
 		ImVec2 staleWarningPos = ImVec2(widgetPos.x - ImGui::GetTextLineHeightWithSpacing(), widgetPos.y);
 		if (staleWarningPos.x < 0) {
 			staleWarningPos.x = widgetPos.x + widgetSize.x;

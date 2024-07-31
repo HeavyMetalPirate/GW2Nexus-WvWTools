@@ -82,6 +82,8 @@ inline void from_json(const json& j, WidgetSettings& settings) {
 struct Settings {
     std::map<std::string, AccountSettings> accountSettings;
 
+    bool hideStaleDataWarnings;
+
     WidgetSettings autoPips;
     WidgetSettings killDeath;
     WidgetSettings victoryPoints;
@@ -97,6 +99,7 @@ struct Settings {
 inline void to_json(json& j, const Settings& settings) {
     j = json{
         {"accountSettings", settings.accountSettings},
+        {"hideStaleDataWarnings", settings.hideStaleDataWarnings},
         {"autoPipsWidget", settings.autoPips},
         {"killDeathWidget", settings.killDeath},
         {"victoryPointsWidget", settings.victoryPoints},
@@ -110,6 +113,8 @@ inline void to_json(json& j, const Settings& settings) {
 inline void from_json(const json& j, Settings& s) {
     if(j.contains("accountSettings"))
         j.at("accountSettings").get_to(s.accountSettings);
+    if (j.contains("hideStaleDataWarnings"))
+        j.at("hideStaleDataWarnings").get_to(s.hideStaleDataWarnings);
 
     if (j.contains("autoPipsWidget"))
         j.at("autoPipsWidget").get_to(s.autoPips);

@@ -55,6 +55,8 @@ extern GuildInfoService guildInfo;
 extern std::chrono::time_point<std::chrono::system_clock> lastUpdate;
 extern gw2api::wvw::Match* match;
 extern bool possibleStaleData;
+extern bool possibleStaleKills;
+extern bool possibleStaleSkirmishScore;
 
 extern Settings settings;
 
